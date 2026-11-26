@@ -188,7 +188,13 @@ pub async fn session(State(auth): State<Arc<Auth>>, headers: HeaderMap) -> Json<
         .iter()
         .map(|p| json!({"id":p.id,"label":p.label}))
         .collect();
-    Json(json!({"access":auth.access(&headers),"providers":providers}))
+    Json(json!({
+        "access":auth.access(&headers), "providers":providers,
+        "read_defaults": {
+            "window_page_rows": culprit_core::DEFAULT_WAREHOUSE_WINDOW_PAGE_ROWS,
+            "artifact_chunk_chars": culprit_core::MAX_WAREHOUSE_ARTIFACT_CHUNK_CHARS
+        }
+    }))
 }
 
 pub async fn login(

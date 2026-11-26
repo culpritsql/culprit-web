@@ -1,7 +1,13 @@
 import { useCallback, useState } from "react";
 import type { IncidentReadReport } from "../../vendor/culprit/app/src/gen/IncidentReadReport";
 import type { PublishedResourceCursor } from "../../vendor/culprit/app/src/gen/PublishedResourceCursor";
-import { api, useRead, type PublishedResourceSelector, type WarehouseConnectionRef } from "./api";
+import {
+  api,
+  useRead,
+  useReadDefaults,
+  type PublishedResourceSelector,
+  type WarehouseConnectionRef,
+} from "./api";
 import { StateMessage, stamp } from "./shared";
 import w from "./en.json";
 
@@ -14,6 +20,7 @@ export function PublishedWindow({
   resource: PublishedResourceSelector;
   report: IncidentReadReport;
 }) {
+  const { window_page_rows: pageRows } = useReadDefaults();
   const [cursors, setCursors] = useState<(PublishedResourceCursor | null)[]>([null]);
   const after = cursors[cursors.length - 1];
   const load = useCallback(
@@ -25,12 +32,12 @@ export function PublishedWindow({
           window: { from: report.from, until: report.until },
           as_of: report.recorded_before,
           view: "published-answers",
-          page_rows: 10,
+          page_rows: pageRows,
           after,
         },
         signal,
       ),
-    [connection, resource, report, after],
+    [connection, resource, report, after, pageRows],
   );
   const result = useRead(load);
   if (result.status !== "ready")

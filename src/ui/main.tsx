@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { ArrowRight, ChevronRight, LayoutGrid, LockKeyhole, LogOut } from "lucide-react";
-import { api, useRead, type Session } from "./api";
+import { api, ReadDefaults, useRead, type Session } from "./api";
 import { Fleet } from "./Fleet";
 import { Incident } from "./Incident";
 import { StateMessage } from "./shared";
@@ -106,7 +106,9 @@ function App() {
                 </>
               )}
             </nav>
-            <Workspace access={access} />
+            <ReadDefaults.Provider value={session.value.read_defaults}>
+              <Workspace access={access} />
+            </ReadDefaults.Provider>
           </>
         ) : (
           <section className="signin panel">

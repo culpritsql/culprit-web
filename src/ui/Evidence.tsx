@@ -1,7 +1,13 @@
 import { useCallback, useState } from "react";
 import type { DiagnosticEvidenceRef } from "../../vendor/culprit/app/src/gen/DiagnosticEvidenceRef";
 import type { WarehouseArtifactTextRead } from "../../vendor/culprit/app/src/gen/WarehouseArtifactTextRead";
-import { api, useRead, type WarehouseConnectionRef, type PublishedResourceSelector } from "./api";
+import {
+  api,
+  useRead,
+  useReadDefaults,
+  type WarehouseConnectionRef,
+  type PublishedResourceSelector,
+} from "./api";
 import { StateMessage, stamp } from "./shared";
 import w from "./en.json";
 type Archive = { connection: WarehouseConnectionRef; resource: PublishedResourceSelector };
@@ -10,10 +16,11 @@ export function Evidence({
   resource,
   reference,
 }: { reference: DiagnosticEvidenceRef } & Archive) {
+  const { artifact_chunk_chars: chunkChars } = useReadDefaults();
   const [fullPayloads, setFullPayloads] = useState(false);
   const [textRead, setTextRead] = useState<WarehouseArtifactTextRead>({
     kind: "inventory",
-    chunk_chars: 4096,
+    chunk_chars: chunkChars,
   });
   const load = useCallback(
     (signal: AbortSignal) =>
@@ -43,7 +50,10 @@ export function Evidence({
         </button>
       )}
       {textRead.kind === "chunk" && (
-        <button className="button" onClick={() => setTextRead({ kind: "inventory", chunk_chars: 4096 })}>
+        <button
+          className="button"
+          onClick={() => setTextRead({ kind: "inventory", chunk_chars: chunkChars })}
+        >
           {w.backInventory}
         </button>
       )}

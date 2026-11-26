@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import type { WarehouseConnectionRef } from "../../vendor/culprit/app/src/gen/WarehouseConnectionRef";
 import type { WarehouseConnectionInfo } from "../../vendor/culprit/app/src/gen/WarehouseConnectionInfo";
 import type { WarehouseFleetRequest } from "../../vendor/culprit/app/src/gen/WarehouseFleetRequest";
@@ -12,8 +12,16 @@ import type { WarehouseWindowReport } from "../../vendor/culprit/app/src/gen/War
 import words from "./en.json";
 export type { WarehouseConnectionRef, WarehouseFleetRequest, PublishedResourceSelector };
 export interface Session {
+  read_defaults: { window_page_rows: number; artifact_chunk_chars: number };
   access: { inspect_evidence: boolean } | null;
   providers: { id: string; label: string }[];
+}
+
+export const ReadDefaults = createContext<Session["read_defaults"] | null>(null);
+export function useReadDefaults() {
+  const defaults = useContext(ReadDefaults);
+  if (!defaults) throw new Error(words.error);
+  return defaults;
 }
 
 async function request<T>(path: string, signal: AbortSignal, body?: unknown): Promise<T> {

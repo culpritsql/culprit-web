@@ -114,7 +114,7 @@ await writeFile(secret, "fixture-secret", { mode: 0o600 });
 const cfg = {
   public_url: base,
   archive_name: "production",
-  evidence_config: "config/archive.example.json",
+  evidence_config: process.env.CULPRIT_FIXTURE_ARCHIVE || "config/archive.example.json",
   auth: {
     providers: [
       { id: "company", label: "Company SSO", issuer, client_id: "culprit", client_secret_file: secret },
