@@ -1,0 +1,37 @@
+{
+  "pipeline": "pilot",
+  "shard": "shard-0",
+  "credentials": {
+    "warehouse-read": {
+      "kind": "azure",
+      "identity": {
+        "kind": "managed-identity",
+        "client_id": null
+      }
+    },
+    "recovery-read": {
+      "kind": "azure",
+      "identity": {
+        "kind": "managed-identity",
+        "client_id": null
+      }
+    }
+  },
+  "recovery": {
+    "provider": "azure-blob",
+    "options": {
+      "account": "culpritarchive",
+      "container": "recovery",
+      "prefix": "pilot/shard-0"
+    },
+    "credential": "recovery-read"
+  },
+  "warehouse": {
+    "provider": "adx",
+    "options": {
+      "endpoint": "https://example.westeurope.kusto.windows.net",
+      "database": "culprit"
+    },
+    "credential": "warehouse-read"
+  }
+}

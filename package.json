@@ -1,0 +1,25 @@
+{
+  "name": "@culpritsql/culprit-web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "check": "tsc --noEmit",
+    "build": "bun run check && vite build",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "lucide-react": "1.68.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.65.0",
+    "@types/react": "19.3.1",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.0.2",
+    "typescript": "7.0.2",
+    "vite": "8.1.0"
+  }
+}

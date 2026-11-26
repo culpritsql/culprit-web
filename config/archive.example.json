@@ -1,0 +1,27 @@
+{
+  "pipeline": "pilot",
+  "shard": "shard-0",
+  "credentials": {
+    "warehouse-read": {
+      "kind": "password-environment",
+      "username": "culprit_reader",
+      "variable": "CULPRIT_WAREHOUSE_PASSWORD"
+    },
+    "recovery-read": { "kind": "aws", "profile": "culprit-archive-reader" }
+  },
+  "recovery": {
+    "provider": "s3",
+    "options": {
+      "bucket": "culprit-private-recovery",
+      "region": "eu-west-1",
+      "prefix": "pilot/shard-0",
+      "expected_owner": "123456789012"
+    },
+    "credential": "recovery-read"
+  },
+  "warehouse": {
+    "provider": "clickhouse",
+    "options": { "endpoint": "https://warehouse.example:8443", "database": "culprit" },
+    "credential": "warehouse-read"
+  }
+}

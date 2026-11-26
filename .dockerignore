@@ -1,0 +1,16 @@
+**
+!Cargo.toml
+!Cargo.lock
+!package.json
+!bun.lock
+!index.html
+!vite.config.ts
+!tsconfig.json
+!src/
+!src/**
+!vendor/
+!vendor/culprit/
+!vendor/culprit/**
+**/.git
+**/node_modules
+**/target

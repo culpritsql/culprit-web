@@ -1,0 +1,32 @@
+{
+  "public_url": "https://culprit.example.com",
+  "archive_name": "production",
+  "evidence_config": "/run/config/archive.json",
+  "auth": {
+    "providers": [
+      {
+        "id": "corporate",
+        "label": "Sign in with Microsoft",
+        "issuer": "https://login.microsoftonline.com/YOUR-TENANT-ID/v2.0",
+        "client_id": "YOUR-APPLICATION-ID",
+        "client_secret_file": "/run/secrets/oidc-client"
+      }
+    ],
+    "grants": [
+      {
+        "provider": "corporate",
+        "archive": "production",
+        "claim": "roles",
+        "value": "Culprit.Viewer",
+        "permissions": ["view_reports"]
+      },
+      {
+        "provider": "corporate",
+        "archive": "production",
+        "claim": "roles",
+        "value": "Culprit.DBA",
+        "permissions": ["view_reports", "inspect_evidence"]
+      }
+    ]
+  }
+}

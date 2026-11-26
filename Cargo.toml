@@ -1,0 +1,21 @@
+[package]
+name = "culprit-web"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+axum = "0.8"
+culprit-archive-web = { path = "vendor/culprit/crates/culprit-archive-web" }
+culprit-engine = { path = "vendor/culprit/crates/culprit-engine", default-features = false }
+culprit-read = { path = "vendor/culprit/crates/culprit-read" }
+openidconnect = "4.1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "net", "signal"] }
+tower-http = { version = "0.6", features = ["fs"] }
+url = "2"
+
+[profile.dev]
+debug = 1
+split-debuginfo = "off"

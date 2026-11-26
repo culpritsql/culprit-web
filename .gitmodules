@@ -1,0 +1,3 @@
+[submodule "vendor/culprit"]
+	path = vendor/culprit
+	url = https://github.com/culpritsql/culprit-sql-studio.git
