@@ -6,9 +6,9 @@
 
 **Self-hosted database fleet command center, archive time-machine, and MCP server for SQL Server, PostgreSQL, and MySQL.**
 
-[![Checks](https://github.com/culpritsql/culprit-fleet/actions/workflows/check.yml/badge.svg?branch=main)](https://github.com/culpritsql/culprit-fleet/actions/workflows/check.yml)
-[![GHCR & Helm](https://github.com/culpritsql/culprit-fleet/actions/workflows/publish.yml/badge.svg?branch=main)](https://github.com/culpritsql/culprit-fleet/actions/workflows/publish.yml)
-[![Live Demo](https://github.com/culpritsql/culprit-fleet/actions/workflows/pages.yml/badge.svg?branch=main)](https://culpritsql.github.io/culprit-fleet/)
+[![Checks](https://github.com/culpritsql/culprit-fleet/actions/workflows/check.yml/badge.svg)](https://github.com/culpritsql/culprit-fleet/actions/workflows/check.yml)
+[![GHCR & Helm](https://github.com/culpritsql/culprit-fleet/actions/workflows/publish.yml/badge.svg)](https://github.com/culpritsql/culprit-fleet/actions/workflows/publish.yml)
+[![Live Demo](https://github.com/culpritsql/culprit-fleet/actions/workflows/pages.yml/badge.svg)](https://culpritsql.github.io/culprit-fleet/)
 [![Collector](https://img.shields.io/badge/collector-culprit--sql--studio-ffcf33)](https://github.com/culpritsql/culprit-sql-studio)
 [![License: MIT](https://img.shields.io/badge/license-MIT-6b93f0)](LICENSE)
 
