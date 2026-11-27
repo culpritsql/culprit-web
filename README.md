@@ -38,13 +38,11 @@ bun run demo
 
 Open [Regional fleets](http://127.0.0.1:4390/?view=regions). Choose the United States, open **Checkout**, inspect **Resources & waits** (CPU/memory curves, wait breakdown, session blocking tree and deadlock graph), or open **Workload** and click **Compare plans** on the top statement.
 
-To build the standalone static showcase bundle (used by `.github/workflows/pages.yml` for GitHub Pages / `fleet.culpritsql.com`):
+To build the standalone static showcase bundle:
 
 ```sh
 bun run build:demo
 ```
-
-> **Custom domain (`fleet.culpritsql.com`)**: Point a `CNAME` DNS record for `fleet.culpritsql.com` to `culpritsql.github.io`, then enter `fleet.culpritsql.com` under **Settings → Pages → Custom domain** in GitHub. Because `build:demo` uses relative asset paths (`./`) and SPA fallback (`404.html`), the same build works on both `culpritsql.github.io/culprit-web/` and `fleet.culpritsql.com/`.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/regions-dark.png">
