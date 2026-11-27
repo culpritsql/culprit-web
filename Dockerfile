@@ -13,6 +13,7 @@ WORKDIR /src
 COPY Cargo.toml Cargo.lock ./
 COPY vendor/culprit vendor/culprit
 COPY src/*.rs src/
+COPY tests/native/publish_incident.rs tests/native/
 RUN cargo build --locked --release
 
 FROM amazon/aws-cli:2.31.10@sha256:c3545440ffb85aac40c104d7fe5cb885d0ed26e91d95a433094a9dba9ddfacd6 AS aws

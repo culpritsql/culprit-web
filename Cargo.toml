@@ -20,8 +20,21 @@ tower-http = { version = "0.6", features = ["fs"] }
 url = "2"
 
 [dev-dependencies]
+culprit-engine = { path = "vendor/culprit/crates/culprit-engine", default-features = false, features = ["collector"] }
+async-trait = "0.1"
+culprit-auth = { path = "vendor/culprit/crates/authentication/culprit-auth" }
+culprit-blob-s3 = { path = "vendor/culprit/crates/recovery/culprit-blob-s3" }
+culprit-checks = { path = "vendor/culprit/crates/culprit-checks" }
+culprit-collector = { path = "vendor/culprit/crates/culprit-collector", features=["test-support"] }
+culprit-evidence = { path = "vendor/culprit/crates/culprit-evidence", features=["test-support"] }
+culprit-store-clickhouse = { path = "vendor/culprit/crates/telemetry/culprit-store-clickhouse", features=["write"] }
+zeroize = "1"
 tempfile = "3"
 
 [profile.dev]
 debug = 1
 split-debuginfo = "off"
+
+[[example]]
+name = "publish-incident-fixture"
+path = "tests/native/publish_incident.rs"

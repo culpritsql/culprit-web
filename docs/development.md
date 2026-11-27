@@ -12,13 +12,18 @@ bunx playwright install chromium --only-shell
 bun run test:e2e
 ```
 
-Browser tests run the application binary with a disposable loopback OIDC provider, real signed tokens and synthetic archive responses. They exercise authorization on the HTTP routes, incident links across sign-in, window pagination and explicit reads of original payloads. The native storage test uses Docker, the AWS CLI and Python 3. It publishes a SQL Server observation through the pinned collector fixture, restarts S3-backed recovery, and opens the database and historical window in Chromium through real ClickHouse and S3-compatible reads. It creates disposable credentials and removes its containers afterward.
+Browser tests run the application binary with a disposable loopback OIDC provider, real signed tokens and synthetic archive responses. They exercise authorization on the HTTP routes, incident links across sign-in, window pagination and explicit reads of original payloads. The native storage test uses Docker, the AWS CLI and Python 3. It exercises two archives on disposable ClickHouse and S3-compatible storage.
 
 ```sh
 python3 -B tests/native/verify.py
 ```
 
-The native fixture contains a resource observation. Browser fixtures supply the detailed incident, attributed and affected queries, and original payload. A live Entra tenant and a published incident on both warehouse backends remain pilot checks.
+| Input | Browser proof |
+|---|---|
+| Published SQL Server resource observation | After recovery restarts, Fleet opens the database and reports an empty incident window. |
+| PostgreSQL blocking corpus | The collector seals the activity and its focused follow-up, computes diagnostic revisions and publishes the derived findings. Once the publisher exits, a DBA opens the established blocking owner and reads the affected statement from its authenticated original. A viewer is denied the shared link and direct original route. |
+
+The workload and incident inputs are controlled fixtures. Real Entra sign-in and the end-to-end Azure Data Explorer plus Blob journey require a deployment with those services.
 
 ## Refresh the README screenshots
 

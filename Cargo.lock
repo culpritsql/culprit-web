@@ -696,6 +696,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "culprit-auth",
+ "culprit-collector",
  "culprit-core",
  "culprit-evidence",
  "ring",
@@ -733,6 +734,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "culprit-collector"
+version = "0.6.2"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "culprit-auth",
+ "culprit-core",
+ "culprit-evidence",
+ "culprit-read",
+ "ring",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "sha2 0.11.2",
+ "tempfile",
+ "tokio",
+ "zeroize",
+]
+
+[[package]]
 name = "culprit-core"
 version = "0.6.2"
 dependencies = [
@@ -761,6 +782,7 @@ dependencies = [
  "culprit-blob-s3",
  "culprit-checks",
  "culprit-cloud",
+ "culprit-collector",
  "culprit-core",
  "culprit-evidence",
  "culprit-plans",
@@ -852,6 +874,7 @@ version = "0.6.2"
 dependencies = [
  "async-trait",
  "chrono",
+ "culprit-collector",
  "culprit-core",
  "culprit-evidence",
  "ring",
@@ -867,12 +890,19 @@ dependencies = [
 name = "culprit-web"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "axum",
  "chrono",
  "culprit-archive-web",
+ "culprit-auth",
+ "culprit-blob-s3",
+ "culprit-checks",
+ "culprit-collector",
  "culprit-core",
  "culprit-engine",
+ "culprit-evidence",
  "culprit-read",
+ "culprit-store-clickhouse",
  "openidconnect",
  "rusqlite",
  "serde",
@@ -881,6 +911,7 @@ dependencies = [
  "tokio",
  "tower-http",
  "url",
+ "zeroize",
 ]
 
 [[package]]

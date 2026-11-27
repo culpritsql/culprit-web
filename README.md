@@ -55,4 +55,4 @@ Rank statements by total time, calls or mean duration. Inspect native time bucke
   <img src="docs/images/workload-light.png" alt="Top SQL with native Query Store intervals, statement time, calls, CPU and logical reads" width="100%">
 </picture>
 
-The screenshots use a sample estate and Culprit's SQL Server workload fixture. The browser suite reproduces the same journey in both themes. [Development and verification](docs/development.md)
+The screenshots use a sample estate and Culprit's SQL Server workload fixture. The native integration test separately verifies a published PostgreSQL blocker and its original SQL on ClickHouse and S3-compatible storage. The browser suite reproduces the same journey in both themes. [Development and verification](docs/development.md)
