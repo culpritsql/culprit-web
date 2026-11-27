@@ -8,7 +8,7 @@
     "dev": "vite",
     "check": "tsc --noEmit",
     "build": "bun run check && vite build",
-    "build:demo": "bun run check && vite build --mode demo --outDir dist-demo && cp dist-demo/index.html dist-demo/404.html && touch dist-demo/.nojekyll",
+    "build:demo": "bun run check && vite build --mode demo --outDir dist-demo && cp dist-demo/index.html dist-demo/404.html && printf 'fleet.culpritsql.com\\n' > dist-demo/CNAME && touch dist-demo/.nojekyll",
     "test:e2e": "playwright test",
     "demo": "bun run build && bun demo/serve.ts"
   },

@@ -8,11 +8,11 @@
 
 [![Checks](https://github.com/culpritsql/culprit-fleet/actions/workflows/check.yml/badge.svg)](https://github.com/culpritsql/culprit-fleet/actions/workflows/check.yml)
 [![GHCR & Helm](https://github.com/culpritsql/culprit-fleet/actions/workflows/publish.yml/badge.svg)](https://github.com/culpritsql/culprit-fleet/actions/workflows/publish.yml)
-[![Live Demo](https://github.com/culpritsql/culprit-fleet/actions/workflows/pages.yml/badge.svg)](https://culpritsql.github.io/culprit-fleet/)
+[![Live Demo](https://github.com/culpritsql/culprit-fleet/actions/workflows/pages.yml/badge.svg)](https://fleet.culpritsql.com/)
 [![Collector](https://img.shields.io/badge/collector-culprit--sql--studio-ffcf33)](https://github.com/culpritsql/culprit-sql-studio)
 [![License: MIT](https://img.shields.io/badge/license-MIT-6b93f0)](LICENSE)
 
-[Architecture](#architecture) · [1. Collector](#1-deploy-the-collector) · [2. Deploy Fleet](#2-deploy-culprit-fleet) · [3. MCP for Agents](#3-connect-coding-agents-mcp) · [Live Demo](https://culpritsql.github.io/culprit-fleet/) · [Self-Hosting Guide](docs/self-hosting.md)
+[Architecture](#architecture) · [1. Collector](#1-deploy-the-collector) · [2. Deploy Fleet](#2-deploy-culprit-fleet) · [3. MCP for Agents](#3-connect-coding-agents-mcp) · [Live Demo](https://fleet.culpritsql.com/) · [Self-Hosting Guide](docs/self-hosting.md)
 
 </div>
 
@@ -97,7 +97,7 @@ Exposed tools: `list_archives`, `fleet_overview`, `investigate_incident`, `query
 
 ## Try the Demo
 
-Open the **[hosted interactive demo](https://culpritsql.github.io/culprit-fleet/)** in your browser (static mode, zero backend required), or run the local demo server with Bun:
+Open the **[hosted interactive demo](https://fleet.culpritsql.com/)** in your browser (static mode, zero backend required), or run the local demo server with Bun:
 
 ```sh
 git clone --recurse-submodules https://github.com/culpritsql/culprit-fleet.git
