@@ -584,92 +584,121 @@ export function RegionalFleet({
               </div>
             </header>
             {triageRows.length > 0 ? (
-              <div className="table-scroll">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Database</th>
-                      <th>Scale unit</th>
-                      <th>Engine</th>
-                      <th>Diagnosis / Signal</th>
-                      <th>CPU / Mem</th>
-                      <th>Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {triageRows.slice(0, 10).map(({ connection, region, row, headline }) => {
-                      const href = investigationUrl(
-                        connection,
-                        row.selector,
-                        row.latest_observed_until ?? row.latest_collected_until,
-                      );
-                      return (
-                        <tr
-                          key={connection.name + ":" + row.resource_id}
-                          className={row.active_incidents > 0 ? "row-attention" : undefined}
-                        >
-                          <td>
-                            <strong>{row.database_name}</strong>
-                            {row.environment && <small>{row.environment}</small>}
-                          </td>
-                          <td>
-                            <span className="scale-region-pill">{region}</span>{" "}
-                            <small style={{ display: "inline" }}>
-                              {connection.name}
-                            </small>
-                          </td>
-                          <td>
+              <div className="triage-feed" role="list">
+                {triageRows
+                  .slice(0, 10)
+                  .map(({ connection, region, row, headline }) => {
+                    const href = investigationUrl(
+                      connection,
+                      row.selector,
+                      row.latest_observed_until ?? row.latest_collected_until,
+                    );
+                    const isIncident = row.active_incidents > 0;
+                    const isStale = row.freshness === "stale";
+                    const severityTone = isIncident
+                      ? "critical"
+                      : isStale
+                        ? "stale"
+                        : "warning";
+
+                    return (
+                      <a
+                        key={connection.name + ":" + row.resource_id}
+                        role="listitem"
+                        className={`triage-row triage-${severityTone}`}
+                        href={href}
+                        onClick={spaClick}
+                      >
+                        <div className="triage-target">
+                          <div className="triage-target-top">
+                            <strong className="triage-db-name">
+                              {row.database_name}
+                            </strong>
                             <EngineBadge engine={row.engine} />
-                          </td>
-                          <td className="triage-headline-cell">
-                            <div className="triage-signal-wrap">
-                              {row.active_incidents > 0 ? (
-                                <span className="status danger">
-                                  <i />
-                                  {row.active_incidents} active
-                                </span>
-                              ) : row.freshness !== "observed" ? (
-                                <span className="status stale">
-                                  <i />
-                                  {row.freshness}
-                                </span>
-                              ) : (
-                                <span className="status partial">
-                                  <i />
-                                  {row.high_findings} high
-                                </span>
-                              )}
-                              <span>{headline}</span>
-                            </div>
-                          </td>
-                          <td>
-                            <div className="util-pair">
-                              <MicroMeter label="CPU" value={row.telemetry?.cpu_pct} />
-                              <MicroMeter label="MEM" value={row.telemetry?.memory_pct} />
-                            </div>
-                          </td>
-                          <td>
-                            <a
-                              className="button button-accent triage-jump-btn"
-                              href={href}
-                              onClick={spaClick}
-                            >
-                              { row.telemetry?.dominant_wait && (
-                                <span className={`wait-pill wait-${waitTone(row.telemetry.dominant_wait)}`}>
-                                  {row.telemetry.dominant_wait}
-                                </span>
-                              )}
-                              Investigate <ArrowRight size={13} />
-                            </a>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                          </div>
+                          <div className="triage-target-meta">
+                            <span>{region}</span>
+                            <i aria-hidden="true">·</i>
+                            <span>{connection.name}</span>
+                            {row.environment && (
+                              <>
+                                <i aria-hidden="true">·</i>
+                                <span>{row.environment}</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="triage-diagnosis">
+                          <p className="triage-headline">{headline}</p>
+                          <div className="triage-pills">
+                            {isIncident ? (
+                              <span className="status danger">
+                                <i />
+                                {row.active_incidents} active{" "}
+                                {row.active_incidents === 1
+                                  ? "incident"
+                                  : "incidents"}
+                              </span>
+                            ) : row.freshness !== "observed" ? (
+                              <span className="status stale">
+                                <i />
+                                {row.freshness} coverage
+                              </span>
+                            ) : (
+                              <span className="status partial">
+                                <i />
+                                {row.high_findings} high{" "}
+                                {row.high_findings === 1
+                                  ? "finding"
+                                  : "findings"}
+                              </span>
+                            )}
+                            {row.telemetry?.dominant_wait && !isStale && (
+                              <span
+                                className={`wait-pill wait-${waitTone(row.telemetry.dominant_wait)}`}
+                              >
+                                Wait: {row.telemetry.dominant_wait}
+                              </span>
+                            )}
+                            {row.recent_regressions > 0 && (
+                              <span className="triage-sub-pill">
+                                {row.recent_regressions} plan{" "}
+                                {row.recent_regressions === 1 ? "flip" : "flips"}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        <div
+                          className={`triage-telemetry ${isStale ? "is-stale" : ""}`}
+                        >
+                          <div className="util-pair">
+                            <MicroMeter
+                              label="CPU"
+                              value={row.telemetry?.cpu_pct}
+                            />
+                            <MicroMeter
+                              label="MEM"
+                              value={row.telemetry?.memory_pct}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="triage-action">
+                          <span className="triage-cta">
+                            <span>Investigate</span>
+                            <ArrowRight size={13} />
+                          </span>
+                        </div>
+                      </a>
+                    );
+                  })}
               </div>
             ) : (
-              <p className="notice">No matching database issues across authorized scale units.</p>
+              <p className="notice">
+                No matching database issues across authorized scale units.
+              </p>
             )}
           </section>
         </>

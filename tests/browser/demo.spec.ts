@@ -5,7 +5,7 @@ for (const theme of ["light", "dark"] as const) {
     "the local regional demo opens without credentials in " + theme + " mode",
     async ({ page }, info) => {
       await page.emulateMedia({ colorScheme: theme, reducedMotion: "reduce" });
-      await page.setViewportSize({ width: 1440, height: 530 });
+      await page.setViewportSize({ width: 1440, height: 1080 });
       await page.clock.setFixedTime(new Date("2026-10-11T12:13:47Z"));
       await page.goto("http://127.0.0.1:4391/?view=regions");
       const cards = page.getByRole("article");

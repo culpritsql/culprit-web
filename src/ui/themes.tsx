@@ -51,16 +51,16 @@ export const THEMES: ThemeMeta[] = [
   {
     id: "daylight",
     label: "Daylight Paper",
-    tagline: "Warm alabaster & forest ink",
+    tagline: "Crisp alabaster & cobalt blue",
     mode: "light",
-    swatches: ["#f6f6f2", "#ffffff", "#176646"],
+    swatches: ["#f6f8fb", "#ffffff", "#2563eb"],
   },
   {
     id: "nordic",
     label: "Nordic Frost",
-    tagline: "Crisp polar slate & glacier blue",
+    tagline: "Polar slate & royal indigo",
     mode: "light",
-    swatches: ["#f1f5f9", "#ffffff", "#0284c7"],
+    swatches: ["#f3f6fa", "#ffffff", "#4f46e5"],
   },
 ];
 
