@@ -1,18 +1,18 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "culprit-web.fullname" . }}
+  name: {{ include "culprit-fleet.fullname" . }}
 spec:
   replicas: 1
   strategy:
     type: Recreate
   selector:
     matchLabels:
-      {{- include "culprit-web.selector" . | nindent 6 }}
+      {{- include "culprit-fleet.selector" . | nindent 6 }}
   template:
     metadata:
       labels:
-        {{- include "culprit-web.selector" . | nindent 8 }}
+        {{- include "culprit-fleet.selector" . | nindent 8 }}
         {{- with .Values.podLabels }}{{ toYaml . | nindent 8 }}{{ end }}
       annotations:
         checksum/config: {{ .Values.config.files | toJson | sha256sum }}
@@ -32,8 +32,8 @@ spec:
         seccompProfile:
           type: RuntimeDefault
       containers:
-        - name: web
-          image: {{ include "culprit-web.image" . | quote }}
+        - name: fleet
+          image: {{ include "culprit-fleet.image" . | quote }}
           imagePullPolicy: {{ .Values.imagePullPolicy | default "IfNotPresent" }}
           ports:
             - name: http
@@ -55,7 +55,7 @@ spec:
           {{- end }}
           volumeMounts:
             - {name: config, mountPath: /run/config, readOnly: true}
-            - {name: state, mountPath: /var/lib/culprit-web}
+            - {name: state, mountPath: /var/lib/culprit-fleet}
             - {name: temp, mountPath: /tmp}
             {{- if .Values.existingSecret }}
             - {name: secrets, mountPath: /run/secrets, readOnly: true}
@@ -63,7 +63,7 @@ spec:
       volumes:
         - name: config
           configMap:
-            name: {{ include "culprit-web.config" . }}
+            name: {{ include "culprit-fleet.config" . }}
         - name: state
           {{- if .Values.persistence.existingClaim }}
           persistentVolumeClaim:

@@ -38,5 +38,5 @@
       }
     ]
   },
-  "metadata_db": "/var/lib/culprit-web/workspace.sqlite3"
+  "metadata_db": "/var/lib/culprit-fleet/workspace.sqlite3"
 }

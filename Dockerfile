@@ -22,25 +22,25 @@ RUN cargo build --locked --release
 
 FROM amazon/aws-cli:2.31.10@sha256:c3545440ffb85aac40c104d7fe5cb885d0ed26e91d95a433094a9dba9ddfacd6 AS aws
 FROM debian:bookworm-slim@sha256:734a72b3d6142a71993b4bc580ca01d8ca687f77a2c422d96a961d3376b179bc
-ARG OCI_SOURCE=https://github.com/culpritsql/culprit-web
+ARG OCI_SOURCE=https://github.com/culpritsql/culprit-fleet
 ARG OCI_VERSION=0.1.0
 ARG OCI_REVISION=unknown
-LABEL org.opencontainers.image.title="Culprit Web" \
+LABEL org.opencontainers.image.title="Culprit Fleet" \
       org.opencontainers.image.description="Self-hosted database fleet command center, archive time-machine, and Entra ID MCP server" \
       org.opencontainers.image.source="${OCI_SOURCE}" \
       org.opencontainers.image.version="${OCI_VERSION}" \
       org.opencontainers.image.revision="${OCI_REVISION}" \
       org.opencontainers.image.licenses="MIT"
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/* && install -d -o 65532 -g 65532 /var/lib/culprit-web
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/* && install -d -o 65532 -g 65532 /var/lib/culprit-fleet
 COPY --from=aws /usr/local/aws-cli /usr/local/aws-cli
 RUN ln -s /usr/local/aws-cli/v2/current/bin/aws /usr/local/bin/aws
 WORKDIR /app
 COPY --from=ui /src/dist dist
-COPY --from=server /src/target/release/culprit-web /usr/local/bin/culprit-web
-COPY vendor/culprit/LICENSE /usr/share/doc/culprit-web/upstream-LICENSE
+COPY --from=server /src/target/release/culprit-fleet /usr/local/bin/culprit-fleet
+COPY vendor/culprit/LICENSE /usr/share/doc/culprit-fleet/upstream-LICENSE
 USER 65532:65532
-ENV CULPRIT_WEB_BIND=0.0.0.0:8080
-ENV HOME=/var/lib/culprit-web
+ENV CULPRIT_FLEET_BIND=0.0.0.0:8080
+ENV HOME=/var/lib/culprit-fleet
 EXPOSE 8080
-ENTRYPOINT ["/usr/local/bin/culprit-web"]
+ENTRYPOINT ["/usr/local/bin/culprit-fleet"]
 CMD ["/run/config/web.json"]

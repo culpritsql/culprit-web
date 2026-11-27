@@ -138,7 +138,7 @@ def acceptance_inputs():
 
 def main():
     azure_archive, incident_args = acceptance_inputs()
-    subprocess.run(["cargo", "build", "--locked", "--bin", "culprit-web"], cwd=ROOT, check=True)
+    subprocess.run(["cargo", "build", "--locked", "--bin", "culprit-fleet"], cwd=ROOT, check=True)
     if not azure_archive:
         subprocess.run(["cargo", "build", "--locked", "--example", "publish-incident-fixture"], cwd=ROOT, check=True)
     binary = test_binary("culprit-blob-s3")

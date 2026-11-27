@@ -820,6 +820,34 @@ dependencies = [
 ]
 
 [[package]]
+name = "culprit-fleet"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "axum",
+ "chrono",
+ "culprit-archive-web",
+ "culprit-auth",
+ "culprit-blob-s3",
+ "culprit-checks",
+ "culprit-collector",
+ "culprit-core",
+ "culprit-engine",
+ "culprit-evidence",
+ "culprit-read",
+ "culprit-store-clickhouse",
+ "openidconnect",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "tower-http",
+ "url",
+ "zeroize",
+]
+
+[[package]]
 name = "culprit-plans"
 version = "0.6.2"
 dependencies = [
@@ -883,34 +911,6 @@ dependencies = [
  "sha2 0.11.2",
  "tokio",
  "ureq",
- "zeroize",
-]
-
-[[package]]
-name = "culprit-web"
-version = "0.1.0"
-dependencies = [
- "async-trait",
- "axum",
- "chrono",
- "culprit-archive-web",
- "culprit-auth",
- "culprit-blob-s3",
- "culprit-checks",
- "culprit-collector",
- "culprit-core",
- "culprit-engine",
- "culprit-evidence",
- "culprit-read",
- "culprit-store-clickhouse",
- "openidconnect",
- "rusqlite",
- "serde",
- "serde_json",
- "tempfile",
- "tokio",
- "tower-http",
- "url",
  "zeroize",
 ]
 

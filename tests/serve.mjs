@@ -192,14 +192,16 @@ const cfg = {
 const path = join(fixture, "web.json");
 await writeFile(path, JSON.stringify(cfg));
 const server = spawn(
-  process.env.CULPRIT_WEB_BINARY || "target/debug/culprit-web",
+  process.env.CULPRIT_FLEET_BINARY ||
+    process.env.CULPRIT_WEB_BINARY ||
+    "target/debug/culprit-fleet",
   [path],
   {
     stdio: "inherit",
     env: {
       ...process.env,
       CULPRIT_WAREHOUSE_PASSWORD: "test-only",
-      CULPRIT_WEB_BIND: "127.0.0.1:4387",
+      CULPRIT_FLEET_BIND: "127.0.0.1:4387",
     },
   },
 );

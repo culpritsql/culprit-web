@@ -2,7 +2,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "culprit-web.fullname" . }}
+  name: {{ include "culprit-fleet.fullname" . }}
 data:
   {{- range $filename, $config := .Values.config.files }}
   {{ $filename | quote }}: {{ $config | toJson | quote }}

@@ -2,7 +2,7 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: {{ include "culprit-web.fullname" . }}
+  name: {{ include "culprit-fleet.fullname" . }}
   {{- with .Values.ingress.annotations }}
   annotations: {{ toYaml . | nindent 4 }}
   {{- end }}
@@ -23,7 +23,7 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: {{ include "culprit-web.fullname" . }}
+                name: {{ include "culprit-fleet.fullname" . }}
                 port:
                   name: http
 {{- end }}

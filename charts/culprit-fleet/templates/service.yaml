@@ -1,10 +1,10 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "culprit-web.fullname" . }}
+  name: {{ include "culprit-fleet.fullname" . }}
 spec:
   selector:
-    {{- include "culprit-web.selector" . | nindent 4 }}
+    {{- include "culprit-fleet.selector" . | nindent 4 }}
   ports:
     - name: http
       port: {{ .Values.service.port }}

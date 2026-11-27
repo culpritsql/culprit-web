@@ -1,7 +1,7 @@
 # Optional full image reference override (including tag or digest).
 # When blank, defaults to imageRepository + imageDigest or imageTag (v<Chart.AppVersion>).
 image: ""
-imageRepository: ghcr.io/culpritsql/culprit-web
+imageRepository: ghcr.io/culpritsql/culprit-fleet
 imageTag: ""
 imageDigest: ""
 imagePullPolicy: IfNotPresent
@@ -18,7 +18,7 @@ env: []
 serviceAccountName: ""
 podLabels: {}
 podAnnotations: {}
-# Existing PVC for metadata_db. The mount is /var/lib/culprit-web.
+# Existing PVC for metadata_db. The mount is /var/lib/culprit-fleet.
 persistence:
   existingClaim: ""
 resources: {}

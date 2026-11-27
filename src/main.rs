@@ -48,7 +48,7 @@ async fn shutdown() {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config_path = env::args_os()
         .nth(1)
-        .ok_or("usage: culprit-web WEB_CONFIG.json")?;
+        .ok_or("usage: culprit-fleet WEB_CONFIG.json")?;
     let config: config::Config = serde_json::from_slice(&fs::read(config_path)?)?;
     let metadata = config
         .metadata_db
@@ -74,9 +74,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .fallback_service(
             ServeDir::new("dist").not_found_service(ServeFile::new("dist/index.html")),
         );
-    let bind = env::var("CULPRIT_WEB_BIND").unwrap_or_else(|_| "127.0.0.1:8080".into());
+    let bind = env::var("CULPRIT_FLEET_BIND")
+        .or_else(|_| env::var("CULPRIT_WEB_BIND"))
+        .unwrap_or_else(|_| "127.0.0.1:8080".into());
     let listener = TcpListener::bind(&bind).await?;
-    eprintln!("Culprit web listening on {}", listener.local_addr()?);
+    eprintln!("Culprit Fleet listening on {}", listener.local_addr()?);
     axum::serve(listener, routes)
         .with_graceful_shutdown(shutdown())
         .await?;
