@@ -410,7 +410,7 @@ test("regional fleets restrict discovery, isolate an unavailable archive and rou
     value.report.incidents[0].entry.title = archive + " blocking incident";
     return route.fulfill({ json: value });
   });
-  await page.goto("/?view=regions");
+  await page.goto("/");
   expect(
     (await (await page.request.get("/api/session")).json()).regions,
   ).toEqual({});

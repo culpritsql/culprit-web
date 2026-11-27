@@ -36,7 +36,7 @@ Configure one entry for each independently published pipeline and shard. Use a s
 
 Each evidence file specifies its own read credentials, warehouse endpoint and recovery bucket or Blob container. Mount the files referenced in your configuration. Map an identity provider role to each archive it may access. A role with a database-specific grant sees its assigned databases.
 
-**Regional fleets** shows one card per authorized fleet archive. Cards on the same page read at one UTC cutoff and report failures individually. A DBA opens one archive to inspect database rows and original evidence. Deep links and saved investigations carry the archive name and revision as well as the database identity.
+Accounts with fleet access to multiple archives open on **Regional fleets**, with one card per authorized archive. Cards on the same page read at one UTC cutoff and report failures individually. A DBA opens one archive to inspect database rows and original evidence. Deep links and saved investigations carry the archive name and revision as well as the database identity.
 
 The web service reads selected data from its configured regions. For installations that require evidence and audit metadata to stay within a region, deploy the service and its metadata volume in that region and configure only the permitted sources.
 

@@ -62,7 +62,8 @@ export function Workspace({
     !name &&
     !revision &&
     !params.has("database") &&
-    params.get("view") === "regions";
+    (params.get("view") === "regions" ||
+      (params.size === 0 && fleetArchives.length > 1));
   if (overview)
     return <RegionalFleet connections={fleetArchives} regions={regions} />;
   const candidates = connections.filter((item) =>
