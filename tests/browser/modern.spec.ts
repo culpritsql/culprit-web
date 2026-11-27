@@ -104,9 +104,17 @@ test("multi-theme switcher, clean routing, scroll stability, telemetry, schema/o
     page.getByRole("heading", { name: /SQL Server Agent jobs/ }),
   ).toBeVisible();
 
-  // Verify Schema and indexes & Operations tabs have rich findings + SQL remediation
+  // Verify Schema and indexes & Operations tabs have rich catalog + findings + SQL remediation
   await page.getByRole("link", { name: "Schema and indexes", exact: true }).click();
   await expect(page).toHaveURL(/\/archives\/Demo%20estate\/investigate\/schema/);
+  await expect(
+    page.getByRole("heading", { name: "Schema & index catalog" }),
+  ).toBeVisible();
+  await expect(page.getByText("ix_customers_email", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: /^Indexes \(/ }).click();
+  await expect(
+    page.getByText("ix_payment_events_legacy_webhook", { exact: true }),
+  ).toBeVisible();
   await expect(
     page.getByText(/Key lookup on shop\.customers/),
   ).toBeVisible();
@@ -129,12 +137,20 @@ test("multi-theme switcher, clean routing, scroll stability, telemetry, schema/o
     name: "Statement inspector",
   });
   await expect(drawer).toBeVisible();
+  expect(await page.evaluate(() => document.body.style.overflow)).toBe("hidden");
+  await drawer.getByRole("button", { name: "Captured execution plan" }).click();
+  await expect(drawer.locator(".pv-toolbar")).toHaveCount(0);
+  await expect(drawer.locator(".plans-sql")).toHaveCount(0);
+  await expect(
+    drawer.getByRole("group", { name: "Execution plan view mode" }),
+  ).toBeVisible();
   await drawer.getByRole("button", { name: "Compare plans" }).first().click();
   await expect(drawer.getByText(/higher estimated cost/i)).toBeVisible();
   await drawer.getByRole("button", { name: "Close statement inspector" }).click();
   await expect(drawer).toHaveCount(0);
+  expect(await page.evaluate(() => document.body.style.overflow)).not.toBe("hidden");
 
-  // Verify MCP Coding Agent modal portals outside sticky header + live JSON-RPC tester
+  // Verify MCP Coding Agent modal portals outside sticky header, has NO internal security banner, + live JSON-RPC tester
   await page.getByRole("button", { name: "Connect coding agent via MCP" }).click();
   const topHeaderBox = await page.locator("header.top").boundingBox();
   expect(topHeaderBox?.height).toBeLessThanOrEqual(68);
@@ -142,6 +158,8 @@ test("multi-theme switcher, clean routing, scroll stability, telemetry, schema/o
     name: "Connect coding agent via MCP",
   });
   await expect(mcpDialog).toBeVisible();
+  await expect(mcpDialog.locator(".mcp-security-banner")).toHaveCount(0);
+  await expect(mcpDialog.getByText(/Access::from_claims/)).toHaveCount(0);
   const mcpBox = await mcpDialog.boundingBox();
   expect(mcpBox?.width).toBeGreaterThanOrEqual(500);
   await mcpDialog.getByRole("button", { name: "Live Tester" }).click();
@@ -150,7 +168,7 @@ test("multi-theme switcher, clean routing, scroll stability, telemetry, schema/o
   await mcpDialog.getByRole("button", { name: "Close MCP modal" }).click();
   await expect(mcpDialog).toHaveCount(0);
 
-  // Command palette (Quick jump) -> PostgreSQL Orders also has rich Schema data!
+  // Command palette (Quick jump) -> PostgreSQL Orders has rich Schema catalog AND Execution Plan Diff!
   await page.getByRole("button", { name: "Quick jump" }).click();
   const paletteInput = page.getByLabel(
     "Jump to database, region, view or theme",
@@ -164,7 +182,38 @@ test("multi-theme switcher, clean routing, scroll stability, telemetry, schema/o
   ).toBeVisible();
   await page.getByRole("link", { name: "Schema and indexes", exact: true }).click();
   await expect(
+    page.getByRole("heading", { name: "Schema & index catalog" }),
+  ).toBeVisible();
+  await expect(page.getByText("order_items_pkey", { exact: true })).toBeVisible();
+  await expect(
     page.getByText(/Unindexed filter & foreign key on public\.order_items/),
+  ).toBeVisible();
+  await page.getByRole("link", { name: "Workload", exact: true }).click();
+  await page
+    .getByRole("row")
+    .filter({ hasText: "2 plans" })
+    .first()
+    .locator(".statement-toggle")
+    .click();
+  const pgDrawer = page.getByRole("dialog", { name: "Statement inspector" });
+  await expect(pgDrawer).toBeVisible();
+  await pgDrawer.getByRole("button", { name: "Captured execution plan" }).click();
+  await expect(pgDrawer.locator(".drawer-plan-stage svg").first()).toBeVisible();
+  await pgDrawer.getByRole("button", { name: "Close statement inspector" }).click();
+
+  // Healthy zero-incident database (Catalog) auto-shows posture + published findings
+  await page.getByRole("button", { name: "Quick jump" }).click();
+  const paletteInput2 = page.getByLabel(
+    "Jump to database, region, view or theme",
+  );
+  await paletteInput2.fill("Catalog");
+  await paletteInput2.press("Enter");
+  await expect(
+    page.getByText(/Unused index idx_sku_prices_old_promo/),
+  ).toBeVisible();
+  await page.getByRole("link", { name: "Schema and indexes", exact: true }).click();
+  await expect(
+    page.getByText("idx_products_attributes_gin", { exact: true }),
   ).toBeVisible();
 });
 

@@ -1,15 +1,26 @@
-import { lazy, Suspense, useCallback, useEffect, useState } from "react";
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { createPortal } from "react-dom";
 import {
   Check,
   ChevronDown,
   ChevronUp,
   Copy,
+  Database,
   GitCompareArrows,
   Layers,
+  ListTree,
   Network,
+  TableProperties,
   X,
 } from "lucide-react";
+import type { PlanLook } from "@culpritsql/plan-viewer";
 import type { QueryStat } from "../../vendor/culprit/app/src/gen/QueryStat";
 import { api, useRead } from "./api";
 import { pct, quantity, stamp, waitTone } from "./shared";
@@ -42,6 +53,17 @@ const LazyPlanDiffViewer = lazy(async () => {
 
 type DrawerTab = "overview" | "plan" | "diff";
 
+const PLAN_LOOKS: Array<{
+  look: PlanLook;
+  label: string;
+  icon: typeof Network;
+}> = [
+  { look: "diagram", label: "Diagram", icon: Network },
+  { look: "tree", label: "Tree", icon: ListTree },
+  { look: "operations", label: "Operators", icon: TableProperties },
+  { look: "objects", label: "Tables", icon: Database },
+];
+
 function InlinePlanDiff({
   query,
   colorMode,
@@ -68,14 +90,23 @@ function InlinePlanDiff({
   if (!planA || !planB) return null;
   if (res.status !== "ready") {
     return (
-      <p className="muted" role={res.status === "error" ? "alert" : "status"}>
+      <p
+        className="muted drawer-status-msg"
+        role={res.status === "error" ? "alert" : "status"}
+      >
         {res.status === "error" ? res.message : w.loading}
       </p>
     );
   }
 
   return (
-    <Suspense fallback={<p role="status">{w.loading}</p>}>
+    <Suspense
+      fallback={
+        <p className="muted drawer-status-msg" role="status">
+          {w.loading}
+        </p>
+      }
+    >
       <LazyPlanDiffViewer
         a={planA}
         b={planB}
@@ -105,16 +136,39 @@ export function QueryInspectorDrawer({
   const { colorMode } = useTheme();
   const query = queries[selectedIndex] ?? queries[0];
   const [tab, setTab] = useState<DrawerTab>("overview");
+  const [planLook, setPlanLook] = useState<PlanLook>("diagram");
   const [copied, setCopied] = useState(false);
+  const bodyRef = useRef<HTMLDivElement>(null);
 
   const hasPlan = Boolean(query?.plan);
   const canCompare = Boolean(
     query?.plan && query?.plan_history?.captured_plan,
   );
 
+  // Lock background document scrolling cleanly with scrollbar width compensation
+  useEffect(() => {
+    const prevOverflow = document.body.style.overflow;
+    const prevPaddingRight = document.body.style.paddingRight;
+    const scrollbarGap =
+      window.innerWidth - document.documentElement.clientWidth;
+    document.body.style.overflow = "hidden";
+    if (scrollbarGap > 0) {
+      document.body.style.paddingRight = `${scrollbarGap}px`;
+    }
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      document.body.style.paddingRight = prevPaddingRight;
+    };
+  }, []);
+
   useEffect(() => {
     setTab("overview");
   }, [query?.id]);
+
+  // Reset internal drawer scroll to top whenever tab or inspected query changes
+  useEffect(() => {
+    bodyRef.current?.scrollTo({ top: 0 });
+  }, [query?.id, tab, planLook]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -146,6 +200,14 @@ export function QueryInspectorDrawer({
       ? (100 * query.logical_reads) / totals.totalReads
       : null;
 
+  const sqlHeadline = query.object_name
+    ? query.object_name
+    : query.text
+      ? query.text.replace(/\s+/g, " ").trim()
+      : `Query ${query.id}`;
+
+  const isFlushCanvas = tab === "plan" || tab === "diff";
+
   return createPortal(
     <div
       className="drawer-backdrop"
@@ -154,7 +216,7 @@ export function QueryInspectorDrawer({
       }}
     >
       <aside
-        className="query-drawer panel"
+        className="query-drawer"
         role="dialog"
         aria-modal="true"
         aria-label="Statement inspector"
@@ -162,8 +224,8 @@ export function QueryInspectorDrawer({
         <header className="query-drawer-head">
           <div className="query-drawer-meta">
             <span className="drawer-rank-pill">#{selectedIndex + 1}</span>
-            <strong>
-              {query.object_name || `Query ${query.id}`}
+            <strong className="drawer-sql-headline" title={sqlHeadline}>
+              {sqlHeadline}
             </strong>
             {sortedWaits[0] && (
               <span
@@ -180,7 +242,11 @@ export function QueryInspectorDrawer({
           </div>
 
           <div className="query-drawer-actions">
-            <div className="drawer-stepper" role="group" aria-label="Step through statements">
+            <div
+              className="drawer-stepper"
+              role="group"
+              aria-label="Step through statements"
+            >
               <button
                 type="button"
                 className="icon-button"
@@ -249,37 +315,65 @@ export function QueryInspectorDrawer({
         </section>
 
         <nav className="drawer-tabs" aria-label="Inspector sections">
-          <button
-            type="button"
-            data-active={tab === "overview"}
-            onClick={() => setTab("overview")}
-          >
-            <Layers size={14} />
-            SQL, Waits &amp; Variants
-          </button>
-          {hasPlan && (
+          <div className="drawer-tabs-primary">
             <button
               type="button"
-              data-active={tab === "plan"}
-              onClick={() => setTab("plan")}
+              data-active={tab === "overview"}
+              onClick={() => setTab("overview")}
             >
-              <Network size={14} />
-              {w.executionPlan}
+              <Layers size={14} />
+              SQL, Waits &amp; Variants
             </button>
-          )}
-          {canCompare && (
-            <button
-              type="button"
-              data-active={tab === "diff"}
-              onClick={() => setTab("diff")}
+            {hasPlan && (
+              <button
+                type="button"
+                data-active={tab === "plan"}
+                onClick={() => setTab("plan")}
+              >
+                <Network size={14} />
+                {w.executionPlan}
+              </button>
+            )}
+            {canCompare && (
+              <button
+                type="button"
+                data-active={tab === "diff"}
+                onClick={() => setTab("diff")}
+              >
+                <GitCompareArrows size={14} />
+                {w.comparePlans}
+              </button>
+            )}
+          </div>
+
+          {tab === "plan" && hasPlan && (
+            <div
+              className="drawer-plan-looks"
+              role="group"
+              aria-label="Execution plan view mode"
             >
-              <GitCompareArrows size={14} />
-              {w.comparePlans}
-            </button>
+              {PLAN_LOOKS.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <button
+                    key={item.look}
+                    type="button"
+                    data-active={planLook === item.look}
+                    onClick={() => setPlanLook(item.look)}
+                  >
+                    <Icon size={12} />
+                    {item.label}
+                  </button>
+                );
+              })}
+            </div>
           )}
         </nav>
 
-        <div className="query-drawer-body">
+        <div
+          ref={bodyRef}
+          className={`query-drawer-body ${isFlushCanvas ? "query-drawer-body-flush" : ""}`}
+        >
           {tab === "overview" && (
             <div className="drawer-overview-stack">
               <section className="drawer-sql-card">
@@ -379,9 +473,9 @@ export function QueryInspectorDrawer({
                         <thead>
                           <tr>
                             <th>{w.planId}</th>
-                            <th>{w.calls}</th>
-                            <th>{w.meanTime}</th>
-                            <th>{w.logicalReads}</th>
+                            <th className="num-col">{w.calls}</th>
+                            <th className="num-col">{w.meanTime}</th>
+                            <th className="num-col">{w.logicalReads}</th>
                             <th>{w.last}</th>
                           </tr>
                         </thead>
@@ -391,9 +485,15 @@ export function QueryInspectorDrawer({
                               <td>
                                 <code>{p.id}</code>
                               </td>
-                              <td>{quantity(p.executions)}</td>
-                              <td>{quantity(p.mean_time_ms)}</td>
-                              <td>{quantity(p.logical_reads)}</td>
+                              <td className="num-col">
+                                {quantity(p.executions)}
+                              </td>
+                              <td className="num-col">
+                                {quantity(p.mean_time_ms)}
+                              </td>
+                              <td className="num-col">
+                                {quantity(p.logical_reads)}
+                              </td>
                               <td>{p.last_seen ? stamp(p.last_seen) : "—"}</td>
                             </tr>
                           ))}
@@ -412,10 +512,19 @@ export function QueryInspectorDrawer({
 
           {tab === "plan" && query.plan && (
             <div className="drawer-plan-stage">
-              <Suspense fallback={<p role="status">{w.loading}</p>}>
+              <Suspense
+                fallback={
+                  <p className="muted drawer-status-msg" role="status">
+                    {w.loading}
+                  </p>
+                }
+              >
                 <LazyPlanViewer
                   plan={query.plan}
                   query={query}
+                  look={planLook}
+                  showToolbar={false}
+                  showStatement={false}
                   theme={colorMode}
                 />
               </Suspense>

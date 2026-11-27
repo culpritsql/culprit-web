@@ -65,6 +65,17 @@ function Cases({
   const latestSample = windowReport?.telemetry?.resources
     .flatMap((r) => r.samples)
     .at(-1);
+  const latestActivity = windowReport?.telemetry?.activity?.at(-1);
+  const latestStorage =
+    windowReport?.telemetry?.storage?.at(-1)?.report.file_summary;
+  const latestRep = windowReport?.telemetry?.replication?.at(-1)?.report;
+  const autoShowPublished = cases.length === 0 && !revisionId;
+  const showPublished = published || autoShowPublished;
+
+  const storageSummary =
+    latestStorage?.data_used_bytes && latestStorage.data_allocated_bytes
+      ? `${(Number(latestStorage.data_used_bytes) / 1024 ** 3).toFixed(1)} / ${(Number(latestStorage.data_allocated_bytes) / 1024 ** 3).toFixed(0)} GiB`
+      : null;
 
   return (
     <>
@@ -84,6 +95,7 @@ function Cases({
               <h2>{revisionId ? w.missingCase : w.none}</h2>
               <p className="muted">
                 Window {stamp(report.from)} – {stamp(report.until)}
+                {latestRep ? ` · ${latestRep.summary}` : ""}
               </p>
             </div>
           </div>
@@ -93,11 +105,21 @@ function Cases({
                 Latest CPU <b>{pct(latestSample.cpu_pct)}</b>
               </span>
               <span>
-                Latest Memory <b>{pct(latestSample.memory_pct)}</b>
+                Memory <b>{pct(latestSample.memory_pct)}</b>
               </span>
               {latestSample.data_io_pct != null && (
                 <span>
                   Data I/O <b>{pct(latestSample.data_io_pct)}</b>
+                </span>
+              )}
+              {latestActivity && (
+                <span>
+                  Active sessions <b>{latestActivity.active_sessions}</b>
+                </span>
+              )}
+              {storageSummary && (
+                <span>
+                  Storage <b>{storageSummary}</b>
                 </span>
               )}
             </div>
@@ -110,7 +132,7 @@ function Cases({
               Top SQL workload <ArrowRight size={12} />
             </a>
             <a className="chip" href={sectionUrl("schema")} onClick={spaClick}>
-              Schema &amp; index advisor <ArrowRight size={12} />
+              Schema &amp; index catalog <ArrowRight size={12} />
             </a>
           </div>
         </section>
@@ -122,17 +144,19 @@ function Cases({
           {...scope}
         />
       ))}
-      <div className="published-toggle-bar">
-        <button
-          className="button"
-          type="button"
-          aria-expanded={published}
-          onClick={() => setPublished((v) => !v)}
-        >
-          {w.published}
-        </button>
-      </div>
-      {published && <PublishedWindow {...scope} report={report} />}
+      {!autoShowPublished && (
+        <div className="published-toggle-bar">
+          <button
+            className="button"
+            type="button"
+            aria-expanded={published}
+            onClick={() => setPublished((v) => !v)}
+          >
+            {w.published}
+          </button>
+        </div>
+      )}
+      {showPublished && <PublishedWindow {...scope} report={report} />}
       {[
         ...report.gaps.map((g) => humanizeGap(g.kind)),
         ...view.analysis_limitations.flatMap((l) => l.reasons),

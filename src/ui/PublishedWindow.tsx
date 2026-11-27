@@ -21,6 +21,7 @@ import {
   type WarehouseConnectionRef,
 } from "./api";
 import { PublishedAnalysis, type PublishedArea } from "./PublishedAnalysis";
+import { SchemaExplorer } from "./SchemaExplorer";
 import { StateMessage, humanizeGap, stamp } from "./shared";
 import w from "./en.json";
 
@@ -70,7 +71,10 @@ export function PublishedWindow({
           resource,
           window: { from: report.from, until: report.until },
           as_of: report.recorded_before,
-          view: "published-answers",
+          view:
+            area === "schema" && after === null
+              ? "compatible-workload"
+              : "published-answers",
           page_rows: pageRows,
           after,
         },
@@ -153,9 +157,13 @@ export function PublishedWindow({
   const filteredNotes = [
     ...page.gaps.map((g) => humanizeGap(g.kind)),
     ...page.qualifications.filter(
-      (q) => q !== "Illustrative archive for the local demo.",
+      (q) =>
+        q !== "Illustrative archive for the local demo." &&
+        !q.startsWith("The demo contains one archived Top SQL report."),
     ),
   ];
+
+  const schemaCatalog = page.telemetry?.schema;
 
   return (
     <div className="published-stack">
@@ -181,9 +189,15 @@ export function PublishedWindow({
         <div className="metric">
           <span>
             <GitCommitHorizontal size={15} />
-            Recorded changes
+            {area === "schema" && schemaCatalog
+              ? "Tables & indexes"
+              : "Recorded changes"}
           </span>
-          <strong>{stats.changes}</strong>
+          <strong>
+            {area === "schema" && schemaCatalog
+              ? `${schemaCatalog.tables.length} / ${schemaCatalog.indexes.length}`
+              : stats.changes}
+          </strong>
         </div>
         <div className="metric">
           <span>
@@ -193,6 +207,10 @@ export function PublishedWindow({
           <strong>{stats.checksEvaluated || (page.published.length ? 18 : 0)}</strong>
         </div>
       </section>
+
+      {area === "schema" && schemaCatalog && (
+        <SchemaExplorer catalog={schemaCatalog} />
+      )}
 
       <section className="panel published-panel">
         <header className="panel-head">

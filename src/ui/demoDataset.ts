@@ -39,6 +39,10 @@ import type { WindowPublishedChange } from "../../vendor/culprit/app/src/gen/Win
 import type { WindowPublishedFinding } from "../../vendor/culprit/app/src/gen/WindowPublishedFinding";
 import type { WindowTelemetry } from "../../vendor/culprit/app/src/gen/WindowTelemetry";
 import type { Workload } from "../../vendor/culprit/app/src/gen/Workload";
+import {
+  buildDatabaseSchemaCatalog,
+  buildDatabaseWorkload,
+} from "./demoCatalogsAndWorkloads";
 
 const sampleReport = fromRust<Report>(sampleReportJson);
 const sample = sampleReport.snapshot;
@@ -137,155 +141,6 @@ export const resource = {
   namespace_id: "a".repeat(64),
   database: "b".repeat(64),
 };
-
-function buildEngineWorkload(engine: Engine, base: Workload): Workload {
-  if (engine === "mssql") return base;
-  const copy = structuredClone(base);
-  if (engine === "postgres") {
-    copy.source = "pg_stat_statements";
-    const pgQueries: Array<[string, string, number, number, number, number]> = [
-      [
-        "pg-q1",
-        "UPDATE public.orders SET fulfillment_state = $1, updated_at = now() WHERE batch_id = $2",
-        84200,
-        46.8,
-        1800,
-        14200,
-      ],
-      [
-        "pg-q2",
-        "SELECT o.id, o.customer_id, o.total_cents, c.tier FROM public.orders o JOIN public.customers c ON c.id = o.customer_id WHERE o.created_at >= $1 ORDER BY o.created_at DESC LIMIT 50",
-        51400,
-        12.4,
-        4145,
-        38900,
-      ],
-      [
-        "pg-q3",
-        "SELECT product_id, SUM(quantity) AS units FROM public.order_items WHERE warehouse_id = $1 AND allocated_at IS NULL GROUP BY product_id",
-        29180,
-        30.4,
-        960,
-        26400,
-      ],
-      [
-        "pg-q4",
-        "INSERT INTO public.outbox_events (aggregate_id, topic, payload) VALUES ($1, $2, $3::jsonb) RETURNING id",
-        11840,
-        0.4,
-        29600,
-        8910,
-      ],
-      [
-        "pg-q5",
-        "SELECT id, sku, available_qty FROM public.inventory_ledger WHERE sku = ANY($1::text[]) FOR UPDATE",
-        9420,
-        3.9,
-        2415,
-        3120,
-      ],
-    ];
-    copy.queries = pgQueries.map(([id, text, total, mean, execs, cpu], idx) =>
-      partial<QueryStat>({
-        ...(copy.queries[idx] ?? copy.queries[0]!),
-        id,
-        text,
-        object_name: null,
-        total_time_ms: total,
-        mean_time_ms: mean,
-        executions: execs,
-        cpu_time_ms: cpu,
-        logical_reads: execs * 42,
-        plan: idx === 1 ? copy.queries.find((q) => q.plan)?.plan ?? null : null,
-        plan_history: undefined,
-        plans: [],
-        waits: [
-          {
-            category: idx === 0 ? "IO" : idx === 4 ? "Lock" : "CPU",
-            wait_type:
-              idx === 0
-                ? "IO: WALSync"
-                : idx === 4
-                  ? "Lock: transactionid"
-                  : "CPU",
-            wait_ms: Math.round(total * 0.62),
-            tasks: execs,
-          },
-        ],
-      }),
-    );
-    copy.query_count = copy.queries.length;
-    copy.total_executions = copy.queries.reduce((s, q) => s + q.executions, 0);
-    return copy;
-  }
-
-  // MySQL performance_schema
-  copy.source = "performance_schema";
-  const myQueries: Array<[string, string, number, number, number, number]> = [
-    [
-      "my-q1",
-      "SELECT tenant_id, DATE(occurred_at) AS d, COUNT(*) AS events, SUM(revenue_micros) FROM analytics.events WHERE occurred_at >= ? GROUP BY tenant_id, DATE(occurred_at)",
-      142600,
-      297.1,
-      480,
-      128400,
-    ],
-    [
-      "my-q2",
-      "SELECT s.id, s.carrier, s.tracking_code FROM fulfillment.shipments s WHERE s.external_ref = ? ORDER BY s.updated_at DESC LIMIT 20",
-      48900,
-      19.5,
-      2508,
-      41200,
-    ],
-    [
-      "my-q3",
-      "UPDATE fulfillment.pick_lists SET state = ?, assigned_worker = ? WHERE warehouse_zone = ? AND state = 'QUEUED' LIMIT 100",
-      19300,
-      16.1,
-      1200,
-      6800,
-    ],
-    [
-      "my-q4",
-      "INSERT INTO analytics.session_rollups (account_id, window_start, page_views, conversions) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE page_views = page_views + VALUES(page_views)",
-      12750,
-      0.8,
-      15900,
-      9400,
-    ],
-  ];
-  copy.queries = myQueries.map(([id, text, total, mean, execs, cpu], idx) =>
-    partial<QueryStat>({
-      ...(copy.queries[idx] ?? copy.queries[0]!),
-      id,
-      text,
-      object_name: null,
-      total_time_ms: total,
-      mean_time_ms: mean,
-      executions: execs,
-      cpu_time_ms: cpu,
-      logical_reads: execs * 115,
-      plan: null,
-      plan_history: undefined,
-      plans: [],
-      waits: [
-        {
-          category: idx === 0 ? "CPU" : "IO",
-          wait_type:
-            idx === 0
-              ? "CPU"
-              : "wait/io/file/innodb/innodb_data_file",
-          wait_ms: Math.round(total * 0.7),
-          tasks: execs,
-        },
-      ],
-    }),
-  );
-  copy.query_count = copy.queries.length;
-  copy.total_executions = copy.queries.reduce((s, q) => s + q.executions, 0);
-  return copy;
-}
 
 interface SeedEntry {
   name: string;
@@ -1115,18 +970,18 @@ function buildWindowTelemetry(
     ],
     deadlocks:
       dbId === resource.database || isLedger ? sampleDeadlocks : [],
-    replication:
-      rowMeta.engine === "postgres"
-        ? [
-            {
-              original: capRef,
-              native_clock: {
-                kind: "observation",
-                from: untilIso,
-                until: untilIso,
-              },
-              read_complete: true,
-              report: partial<ReplicationReport>({
+    replication: [
+      {
+        original: capRef,
+        native_clock: {
+          kind: "observation",
+          from: untilIso,
+          until: untilIso,
+        },
+        read_complete: true,
+        report:
+          rowMeta.engine === "postgres"
+            ? partial<ReplicationReport>({
                 title: "PostgreSQL streaming replication",
                 summary: isOrders
                   ? "1 physical standby observed · 18.4 s replay delay"
@@ -1149,10 +1004,63 @@ function buildWindowTelemetry(
                     ],
                   },
                 ],
-              }),
-            },
-          ]
-        : [],
+              })
+            : rowMeta.engine === "mssql"
+              ? partial<ReplicationReport>({
+                  title: "SQL Server Always On Availability Group",
+                  summary:
+                    "2 replicas synchronized · 1 synchronous HA secondary, 1 async DR secondary",
+                  entries: [
+                    {
+                      title: `${rowMeta.connection_alias ?? "sql"}-ha-02 (SYNCHRONOUS_COMMIT)`,
+                      explanation:
+                        "Synchronous failover partner is healthy and hardened to commit LSN.",
+                      conditions: [],
+                      fields: [
+                        { key: "sync_state", label: "Sync state", value: "SYNCHRONIZED" },
+                        { key: "log_send_lag", label: "Log send queue", value: "0 KiB (3 ms)" },
+                        { key: "redo_lag", label: "Redo lag", value: dbId === resource.database ? "18 ms" : "6 ms" },
+                      ],
+                    },
+                    {
+                      title: `${rowMeta.connection_alias ?? "sql"}-dr-west (ASYNCHRONOUS_COMMIT)`,
+                      explanation:
+                        "Cross-region disaster recovery replica streaming log blocks continuously.",
+                      conditions: [],
+                      fields: [
+                        { key: "sync_state", label: "Sync state", value: "SYNCHRONIZING" },
+                        { key: "log_send_lag", label: "Log send queue", value: "128 KiB" },
+                        { key: "redo_lag", label: "Redo lag", value: "42 ms" },
+                      ],
+                    },
+                  ],
+                })
+              : partial<ReplicationReport>({
+                  title: "MySQL GTID replication topology",
+                  summary: isAnalytics
+                    ? "1 read replica observed · 1.2 s SQL applier lag under rollup load"
+                    : "1 semi-sync replica observed · 38 ms GTID apply lag (healthy)",
+                  entries: [
+                    {
+                      title: `${rowMeta.connection_alias ?? "mysql"}-replica-01 (GTID auto-position)`,
+                      explanation: isAnalytics
+                        ? "Multi-threaded applier workers processing large event batch transactions."
+                        : "Semi-synchronous GTID stream caught up with binary log coordinates.",
+                      conditions: [],
+                      fields: [
+                        { key: "io_thread", label: "IO thread", value: "Yes (streaming)" },
+                        { key: "sql_thread", label: "SQL applier", value: "Yes (8 workers)" },
+                        {
+                          key: "seconds_behind",
+                          label: "Apply lag",
+                          value: isAnalytics ? "1.2 s" : "38 ms",
+                        },
+                      ],
+                    },
+                  ],
+                }),
+      },
+    ],
     node_resources: [
       partial<NodeResources>({
         nodes: [
@@ -1565,56 +1473,76 @@ function buildWindowTelemetry(
           summary:
             rowMeta.active_incidents > 0 || isAnalytics
               ? "1 statement spilled 143.9 MiB (18,420 pages) to temporary storage in this window"
-              : "Zero sort or hash spills recorded across cached statements",
+              : "1 minor sort spill (18.4 MiB) observed across analytical/export queries",
           limitations: [],
           read_complete: true,
           native_rows: 1,
           observed_rows: 1,
-          entries:
-            rowMeta.active_incidents > 0 || isAnalytics
-              ? [
-                  partial<CompletedSpillEntry>({
-                    state: "recorded-spills",
-                    title:
-                      rowMeta.engine === "mssql"
-                        ? "Level-2 Sort & Hash spill to tempdb (18,420 pages)"
-                        : rowMeta.engine === "postgres"
-                          ? "External merge disk sort spilled 384 MiB across 12 temp files"
-                          : "TempTable overflowed RAM budget to disk (64 on-disk temp tables)",
-                    statement_preview:
-                      rowMeta.engine === "mssql"
-                        ? "SELECT c.id, c.email, o.total_cents FROM shop.customers c JOIN shop.orders o ON o.customer_id = c.id WHERE c.region = @r ORDER BY o.created_at DESC"
-                        : rowMeta.engine === "postgres"
-                          ? "SELECT oi.sku, SUM(oi.qty * oi.unit_price) FROM public.order_items oi GROUP BY oi.sku ORDER BY 2 DESC"
-                          : "SELECT tenant_id, DATE(occurred_at) AS d, COUNT(*) FROM analytics.events GROUP BY tenant_id, DATE(occurred_at)",
-                    statement_preview_truncated: false,
-                    statement_unavailable: null,
-                    explanation:
-                      "Under-estimated input rows caused the execution grant to overflow RAM into temporary disk blocks, inflating I/O latency.",
-                    metrics: [
-                      {
-                        label: "Spilled volume",
-                        value: 143.9,
-                        unit: "count",
-                        text:
-                          rowMeta.engine === "postgres"
-                            ? "384.0 MiB"
-                            : "143.9 MiB (18,420 pages)",
-                      },
-                      {
-                        label: "Affected executions",
-                        value: 142,
-                        unit: "count",
-                        text: "142 runs",
-                      },
-                    ],
-                    investigation:
-                      "Update multi-column statistics or add an index matching the GROUP BY / ORDER BY key.",
-                    verify:
-                      "Confirm temp_bytes / spilled_pages remain 0 across subsequent intervals.",
-                  }),
-                ]
-              : [],
+          entries: [
+            partial<CompletedSpillEntry>({
+              state: "recorded-spills",
+              title:
+                rowMeta.active_incidents > 0 || isAnalytics
+                  ? rowMeta.engine === "mssql"
+                    ? "Level-2 Sort & Hash spill to tempdb (18,420 pages)"
+                    : rowMeta.engine === "postgres"
+                      ? "External merge disk sort spilled 384 MiB across 12 temp files"
+                      : "TempTable overflowed RAM budget to disk (64 on-disk temp tables)"
+                  : rowMeta.engine === "mssql"
+                    ? "Level-1 Sort spill to tempdb (2,350 pages)"
+                    : rowMeta.engine === "postgres"
+                      ? "External quicksort spilled 18.4 MiB to pg_pgsql_tmp"
+                      : "Filesort merge pass wrote 22.1 MiB to tmpdir",
+              statement_preview:
+                rowMeta.database_name === "Ledger"
+                  ? "SELECT account_id, SUM(amount_cents) FROM dbo.ledger_entries WHERE posted_at >= @since GROUP BY account_id ORDER BY 2 DESC"
+                  : rowMeta.database_name === "Billing"
+                    ? "SELECT il.invoice_id, SUM(il.amount_cents) FROM billing.invoice_lines il GROUP BY il.invoice_id ORDER BY 2 DESC"
+                    : rowMeta.database_name === "Fulfillment"
+                      ? "SELECT s.id, s.carrier, s.tracking_code FROM fulfillment.shipments s WHERE s.external_ref = ? ORDER BY s.updated_at DESC LIMIT 20"
+                      : rowMeta.database_name === "Catalog"
+                        ? "SELECT product_id, MIN(price_cents), MAX(price_cents) FROM catalog.sku_prices WHERE currency = $1 GROUP BY product_id"
+                        : rowMeta.database_name === "Inventory"
+                          ? "SELECT sku, warehouse_id, SUM(qty) FROM inventory.reservations WHERE state = 'ACTIVE' AND expires_at < now() GROUP BY sku, warehouse_id"
+                          : rowMeta.engine === "mssql"
+                            ? "SELECT c.id, c.email, o.total_cents FROM shop.customers c JOIN shop.orders o ON o.customer_id = c.id WHERE c.region = @r ORDER BY o.created_at DESC"
+                            : rowMeta.engine === "postgres"
+                              ? "SELECT oi.product_id, SUM(oi.quantity) FROM public.order_items oi WHERE warehouse_id = $1 GROUP BY oi.product_id"
+                              : "SELECT tenant_id, DATE(occurred_at) AS d, COUNT(*) FROM analytics.events GROUP BY tenant_id, DATE(occurred_at)",
+              statement_preview_truncated: false,
+              statement_unavailable: null,
+              explanation:
+                rowMeta.active_incidents > 0 || isAnalytics
+                  ? "Under-estimated input rows caused the execution grant to overflow RAM into temporary disk blocks, inflating I/O latency."
+                  : "Periodic reporting/batch sort slightly exceeded in-memory sort workspace without impacting OLTP p99 latency.",
+              metrics: [
+                {
+                  label: "Spilled volume",
+                  value: rowMeta.active_incidents > 0 || isAnalytics ? 143.9 : 18.4,
+                  unit: "count",
+                  text:
+                    rowMeta.active_incidents > 0 || isAnalytics
+                      ? rowMeta.engine === "postgres"
+                        ? "384.0 MiB"
+                        : "143.9 MiB (18,420 pages)"
+                      : "18.4 MiB",
+                },
+                {
+                  label: "Affected executions",
+                  value: rowMeta.active_incidents > 0 || isAnalytics ? 142 : 19,
+                  unit: "count",
+                  text:
+                    rowMeta.active_incidents > 0 || isAnalytics
+                      ? "142 runs"
+                      : "19 runs",
+                },
+              ],
+              investigation:
+                "Update multi-column statistics or add an index matching the GROUP BY / ORDER BY key.",
+              verify:
+                "Confirm temp_bytes / spilled_pages drop to 0 across subsequent intervals.",
+            }),
+          ],
         }),
       },
     ],
@@ -1726,6 +1654,11 @@ function buildWindowTelemetry(
         }),
       },
     ],
+    schema: buildDatabaseSchemaCatalog(
+      rowMeta.database_name,
+      rowMeta.engine,
+      untilIso,
+    ),
   };
 }
 
@@ -1898,6 +1831,313 @@ function populatePublishedAnalysis(
     };
     return clone;
   };
+
+  if (rowMeta.database_name === "Ledger") {
+    pub.findings = [
+      makeFinding(
+        "covering_index:dbo.ledger_entries",
+        "indexes",
+        "high",
+        "Key lookup on dbo.ledger_entries (ix_ledger_account) causes recurring read/write deadlocks",
+        "Balance inquiries seek ix_ledger_account then perform 29,800 key lookups into pk_ledger_entries, colliding with concurrent settlement writers in opposite lock order.",
+        [
+          ["Deadlocks / 15m", "4 cycles"],
+          ["Key lookups", "29,800"],
+          ["Est. cost reduction", "96.8%"],
+        ],
+        "Replace ix_ledger_account with a covering nonclustered index including amount_cents and direction online.",
+        "CREATE NONCLUSTERED INDEX [ix_ledger_account_covering]\nON [dbo].[ledger_entries] ([account_id], [posted_at])\nINCLUDE ([amount_cents], [direction])\nWITH (ONLINE = ON, SORT_IN_TEMPDB = ON);",
+        [
+          "Confirm balance inquiry plan uses Index Seek without Key Lookup on pk_ledger_entries.",
+          "Verify error 1205 deadlock count remains zero across settlement runs.",
+        ],
+      ),
+      makeFinding(
+        "lock_escalation:dbo.ledger_entries",
+        "posture",
+        "medium",
+        "Table-level lock escalation enabled on partitioned ledger workload",
+        "Large settlement batches crossing 5,000 row locks escalate to exclusive table locks on dbo.ledger_entries.",
+        [
+          ["Escalations", "2"],
+          ["Blocked readers", "6"],
+        ],
+        "Switch LOCK_ESCALATION to AUTO or DISABLE while batching journal commits under 2,500 rows.",
+        "ALTER TABLE [dbo].[ledger_entries] SET (LOCK_ESCALATION = AUTO);",
+        ["Verify index_lock_escalations remains 0 in sys.dm_db_index_operational_stats."],
+      ),
+      makeFinding(
+        "job_retry_policy:Settlement_Reconcile_15m",
+        "maintenance",
+        "medium",
+        "SQL Agent job Settlement_Reconcile_15m lacks deadlock retry backoff",
+        "Step 2 aborts immediately on error 1205 without retry interval configured in msdb.",
+        [
+          ["Failed runs", "1"],
+          ["Configured retries", "0"],
+        ],
+        "Configure 3 step retries with 15-second backoff in SQL Server Agent.",
+        "EXEC msdb.dbo.sp_update_jobstep @job_name = N'Settlement_Reconcile_15m', @step_id = 2, @retry_attempts = 3, @retry_interval = 1;",
+        ["Confirm next scheduled 15m execution completes with status Succeeded."],
+      ),
+    ];
+    pub.changes = [
+      makeChange(
+        "chg:ledger-stats",
+        "statistics",
+        midIso,
+        "Updated statistics on dbo.ledger_entries (ix_ledger_account)",
+        "Sampled 18.2% of 29,400,000 rows following institutional settlement batch.",
+        "dbo.ledger_entries",
+      ),
+      makeChange(
+        "chg:ledger-job-fail",
+        "job-execution",
+        earlyIso,
+        "SQL Agent job Settlement_Reconcile_15m failed on step 2",
+        "Chosen as deadlock victim (error 1205) on pk_ledger_entries.",
+        "Settlement_Reconcile_15m",
+        "failed",
+      ),
+    ];
+    return pub;
+  }
+
+  if (rowMeta.database_name === "Billing") {
+    pub.findings = [
+      makeFinding(
+        "covering_index:billing.invoices",
+        "indexes",
+        "medium",
+        "Key lookup on billing.invoices (ix_invoices_account) adds 14,800 random page reads",
+        "Open-invoice portal queries seek ix_invoices_account then lookup status, amount_due_cents, and due_date from pk_invoices.",
+        [
+          ["Key lookups", "14,800"],
+          ["Est. cost reduction", "92.1%"],
+        ],
+        "Extend ix_invoices_account with status equality key and INCLUDE (amount_due_cents, due_date).",
+        "CREATE NONCLUSTERED INDEX [ix_invoices_account_open]\nON [billing].[invoices] ([account_id], [status])\nINCLUDE ([amount_due_cents], [due_date])\nWITH (ONLINE = ON);",
+        ["Verify Query ID bill-q1 eliminates Key Lookup operator."],
+      ),
+      makeFinding(
+        "unused_index:billing.payment_attempts",
+        "indexes",
+        "low",
+        "Unused index ix_payment_attempts_gateway_raw incurs 92,700 writes with zero reads",
+        "Maintained on every payment attempt insert/update without serving any query seek or scan.",
+        [
+          ["Index size", "5.2 GiB"],
+          ["Reads", "0"],
+          ["Writes", "92,700"],
+        ],
+        "Disable ix_payment_attempts_gateway_raw first so rollback is instant if a monthly job references it.",
+        "ALTER INDEX [ix_payment_attempts_gateway_raw] ON [billing].[payment_attempts] DISABLE;",
+        ["Monitor Query Store for 7 days before dropping disabled index metadata."],
+      ),
+      makeFinding(
+        "maxdop_staging:billing",
+        "configuration",
+        "low",
+        "Database-scoped MAXDOP is unlimited (0) on 16-vCore staging pool",
+        "Invoice export hash joins can monopolize all schedulers during billing dry runs.",
+        [
+          ["Current MAXDOP", "0"],
+          ["Recommended", "8"],
+        ],
+        "Cap database-scoped MAXDOP to 8.",
+        "ALTER DATABASE SCOPED CONFIGURATION SET MAXDOP = 8;",
+        ["Verify value = 8 in sys.database_scoped_configurations."],
+      ),
+    ];
+    pub.changes = [
+      makeChange(
+        "chg:bill-idx",
+        "index",
+        midIso,
+        "Created filtered index ix_invoices_due_open",
+        "Online index build completed on billing.invoices (due_date) WHERE status = 'OPEN'.",
+        "billing.invoices",
+      ),
+      makeChange(
+        "chg:bill-setting",
+        "setting",
+        earlyIso,
+        "Enabled Query Store wait statistics capture",
+        "WAIT_STATS_CAPTURE_MODE set to ON for staging workload baseline.",
+      ),
+    ];
+    return pub;
+  }
+
+  if (rowMeta.database_name === "Catalog") {
+    pub.findings = [
+      makeFinding(
+        "unused_index:catalog.sku_prices",
+        "indexes",
+        "medium",
+        "Unused index idx_sku_prices_old_promo wastes 3.4 GiB and slows price feed upserts",
+        "Zero index scans recorded across 142,400 price table writes since holiday campaign ended.",
+        [
+          ["Index size", "3.4 GiB"],
+          ["Index scans", "0"],
+          ["Tuple writes", "142,400"],
+        ],
+        "Monitor over full weekly cycle; replace or retire obsolete campaign index outside peak deploys.",
+        "-- Verify zero scans in pg_stat_user_indexes across all read replicas:\nSELECT idx_scan, pg_size_pretty(pg_relation_size('catalog.idx_sku_prices_old_promo'))\nFROM pg_stat_user_indexes\nWHERE indexrelname = 'idx_sku_prices_old_promo';",
+        ["Confirm idx_scan = 0 on both primary and read replicas before scheduled cleanup."],
+      ),
+      makeFinding(
+        "gin_pending_list:catalog.products",
+        "maintenance",
+        "low",
+        "GIN index idx_products_attributes_gin fastupdate pending list spikes search p99",
+        "Batch product attribute updates accumulate in the GIN pending list until 4MB cleanup runs synchronously inside user SELECTs.",
+        [
+          ["GIN index size", "4.4 GiB"],
+          ["Pending cleanup spike", "38 ms"],
+        ],
+        "Lower gin_pending_list_limit to 1024 kB on idx_products_attributes_gin and tune autovacuum.",
+        "ALTER INDEX catalog.idx_products_attributes_gin SET (gin_pending_list_limit = 1024);",
+        ["Confirm search query p99 latency smooths out during catalog sync runs."],
+      ),
+    ];
+    pub.changes = [
+      makeChange(
+        "chg:cat-stats",
+        "statistics",
+        midIso,
+        "Auto-analyze completed on catalog.sku_prices",
+        "Updated MCV and histogram bounds on 16,800,000 price rows.",
+        "catalog.sku_prices",
+      ),
+      makeChange(
+        "chg:cat-setting",
+        "setting",
+        earlyIso,
+        "Tuned random_page_cost from 4.0 to 1.1",
+        "Aligned planner cost model with NVMe-backed Aurora storage.",
+      ),
+    ];
+    return pub;
+  }
+
+  if (rowMeta.database_name === "Inventory") {
+    pub.findings = [
+      makeFinding(
+        "missing_partial_index:inventory.reservations",
+        "indexes",
+        "medium",
+        "Sequential scan on inventory.reservations during expired-hold sweeper",
+        "Expiration sweeper scans 5.9M rows every minute because no partial index covers state = 'ACTIVE' ordered by expires_at.",
+        [
+          ["Seq scans", "2,840"],
+          ["Dead tuples", "820K (12.2%)"],
+          ["Est. impact", "88.5%"],
+        ],
+        "Create a partial B-tree index concurrently on active reservation expirations.",
+        "CREATE INDEX CONCURRENTLY idx_reservations_active_exp\nON inventory.reservations (expires_at)\nINCLUDE (sku, warehouse_id, qty)\nWHERE state = 'ACTIVE';",
+        ["Confirm EXPLAIN uses Index Only Scan on idx_reservations_active_exp."],
+      ),
+      makeFinding(
+        "autovacuum_reservations:inventory.reservations",
+        "maintenance",
+        "low",
+        "Dead tuple ratio reached 12.2% on high-churn inventory.reservations",
+        "Frequent hold creation and release outpaces default 20% autovacuum threshold.",
+        [
+          ["Dead tuples", "820,000"],
+          ["Table size", "18.4 GiB"],
+        ],
+        "Set autovacuum_vacuum_scale_factor = 0.03 on inventory.reservations.",
+        "ALTER TABLE inventory.reservations SET (autovacuum_vacuum_scale_factor = 0.03);",
+        ["Verify n_dead_tup drops below 180K in pg_stat_user_tables."],
+      ),
+    ];
+    pub.changes = [
+      makeChange(
+        "chg:inv-index",
+        "index",
+        midIso,
+        "Reindexed inventory.idx_stock_sku_warehouse concurrently",
+        "Compacted B-tree leaf pages following staging load test.",
+        "inventory.stock_levels",
+      ),
+      makeChange(
+        "chg:inv-setting",
+        "setting",
+        earlyIso,
+        "Configured lock_timeout = '3s' on inventory_worker role",
+        "Prevents reservation sweeps from queueing behind DDL migrations.",
+      ),
+    ];
+    return pub;
+  }
+
+  if (rowMeta.database_name === "Fulfillment") {
+    pub.findings = [
+      makeFinding(
+        "missing_index:fulfillment.shipments",
+        "indexes",
+        "high",
+        "Table scan + filesort on fulfillment.shipments (external_ref, updated_at)",
+        "Carrier webhook lookups scan 96,200 rows and spill 22.1 MiB to filesort because external_ref is unindexed.",
+        [
+          ["DB time share", "62.6%"],
+          ["Rows examined / call", "96,200"],
+          ["Est. cost reduction", "91.4%"],
+        ],
+        "Add composite index (external_ref, updated_at DESC) inplace with LOCK=NONE.",
+        "ALTER TABLE fulfillment.shipments\nADD INDEX idx_shipments_ext_ref_updated (external_ref, updated_at DESC),\nALGORITHM=INPLACE, LOCK=NONE;",
+        ["Verify EXPLAIN shows ref access on idx_shipments_ext_ref_updated without Using filesort."],
+      ),
+      makeFinding(
+        "unused_index:fulfillment.pick_lists",
+        "indexes",
+        "low",
+        "Unused secondary index idx_pick_lists_legacy_wave consumes 9.6 GiB",
+        "Maintained across 320,000 warehouse pick-list updates with zero index reads.",
+        [
+          ["Index size", "9.6 GiB"],
+          ["Writes", "320,000"],
+        ],
+        "Make idx_pick_lists_legacy_wave INVISIBLE first so the optimizer ignores it reversibly.",
+        "ALTER TABLE fulfillment.pick_lists ALTER INDEX idx_pick_lists_legacy_wave INVISIBLE;",
+        ["Confirm zero latency change across 7 days before dropping."],
+      ),
+      makeFinding(
+        "innodb_flush_neighbors:fulfillment",
+        "configuration",
+        "low",
+        "innodb_flush_neighbors = 1 adds unnecessary write amplification on NVMe SSD",
+        "Neighbor page flushing is designed for rotational disks and wastes IOPS on cloud SSD volumes.",
+        [
+          ["Current value", "1"],
+          ["Recommended", "0"],
+        ],
+        "Disable innodb_flush_neighbors dynamically via SET PERSIST.",
+        "SET PERSIST innodb_flush_neighbors = 0;",
+        ["Confirm SHOW VARIABLES LIKE 'innodb_flush_neighbors' returns OFF/0."],
+      ),
+    ];
+    pub.changes = [
+      makeChange(
+        "chg:ful-stats",
+        "statistics",
+        midIso,
+        "InnoDB persistent statistics recalculated on fulfillment.shipments",
+        "ANALYZE TABLE updated cardinality estimates across 3 indexes.",
+        "fulfillment.shipments",
+      ),
+      makeChange(
+        "chg:ful-setting",
+        "setting",
+        earlyIso,
+        "Updated innodb_io_capacity_max from 2000 to 6000",
+        "Raised dirty-page background flushing ceiling on production volume.",
+      ),
+    ];
+    return pub;
+  }
 
   if (rowMeta.engine === "mssql") {
     const firstSchema = structuredClone(baseFindingWrap);
@@ -2286,11 +2526,7 @@ export function sampleWindow(
     const fullReport =
       from <= Date.parse(workload.window_start!) &&
       until >= Date.parse(around);
-    const hasReportTime =
-      from < Date.parse(around) && until >= Date.parse(around);
-    if (!hasReportTime) {
-      report.published = [];
-    } else if (report.published[0]) {
+    if (report.published[0]) {
       report.published = [
         populatePublishedAnalysis(
           report.published[0],
@@ -2305,7 +2541,6 @@ export function sampleWindow(
       report.qualifications.push(
         "The demo contains one archived Top SQL report. Its statement rankings cover the full captured window.",
       );
-      return report;
     }
   } else if (report.published[0]) {
     report.published = [
@@ -2319,7 +2554,11 @@ export function sampleWindow(
   }
 
   if (request.view === "compatible-workload") {
-    const engineWorkload = buildEngineWorkload(rowMeta.engine, workload);
+    const engineWorkload = buildDatabaseWorkload(
+      rowMeta.database_name,
+      rowMeta.engine,
+      workload,
+    );
     report.workload = {
       kind: "evaluated",
       analysis: partial<CollectedQueryWindowAnalysis>({

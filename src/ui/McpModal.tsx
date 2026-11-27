@@ -6,7 +6,6 @@ import {
   Copy,
   KeyRound,
   Play,
-  ShieldCheck,
   Terminal,
   X,
 } from "lucide-react";
@@ -97,13 +96,19 @@ function McpModal({
   const [tab, setTab] = useState<ConfigTab>("claude");
   const [output, setOutput] = useState<string>("");
   const [running, setRunning] = useState(false);
+  const [copiedEndpoint, setCopiedEndpoint] = useState(false);
 
   useEffect(() => {
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener("keydown", onKey);
+    };
   }, [onClose]);
 
   const origin =
@@ -193,8 +198,8 @@ export CULPRIT_MCP_TOKEN="$(az account get-access-token \\
             <div>
               <h2>Model Context Protocol (MCP) Server</h2>
               <small>
-                Streamable HTTP endpoint · Microsoft Entra ID / OIDC RBAC &amp;
-                audit logging
+                Connect Claude Code, Cursor, or VS Code agents to investigate
+                incidents &amp; execution plans
               </small>
             </div>
           </div>
@@ -209,18 +214,20 @@ export CULPRIT_MCP_TOKEN="$(az account get-access-token \\
         </header>
 
         <div className="mcp-modal-body">
-          <div className="mcp-security-banner">
-            <ShieldCheck size={16} />
-            <div>
-              <strong>Same Entra ID identity, zero shared static keys</strong>
-              <p>
-                <code>POST /mcp</code> verifies Microsoft Entra ID / OIDC JWTs
-                against cached JWKS, maps <code>roles</code> / group claims
-                through the exact same <code>Access::from_claims</code> database
-                grants as the web UI, and records every tool call in{" "}
-                <code>access_audit</code>.
-              </p>
-            </div>
+          <div className="mcp-endpoint-bar">
+            <code>{endpoint}</code>
+            <button
+              type="button"
+              className="chip"
+              onClick={() => {
+                navigator.clipboard?.writeText(endpoint);
+                setCopiedEndpoint(true);
+                setTimeout(() => setCopiedEndpoint(false), 1800);
+              }}
+            >
+              {copiedEndpoint ? <Check size={12} /> : <Copy size={12} />}
+              {copiedEndpoint ? "Copied URL" : "Copy endpoint"}
+            </button>
           </div>
 
           <nav className="drawer-tabs mcp-tabs" aria-label="MCP setup guides">

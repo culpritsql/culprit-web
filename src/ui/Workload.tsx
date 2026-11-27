@@ -58,13 +58,15 @@ function StatementRow({
   const val = valOf(query, metric);
   const share =
     metric !== "mean_time_ms" && metricSum > 0 ? (100 * val) / metricSum : null;
+  const barPct = maximum > 0 ? Math.max(3, (100 * val) / maximum) : 0;
+  const barTone = topWait ? `seg-${waitTone(topWait.category)}` : "";
 
   return (
     <tr
       className={selected ? "statement-selected-row" : "statement-clickable-row"}
       onClick={onSelect}
     >
-      <td>
+      <td className="stmt-cell">
         <button
           type="button"
           className="statement-toggle"
@@ -74,11 +76,15 @@ function StatementRow({
             onSelect();
           }}
         >
-          <span className="stmt-rank">#{rank}</span>
+          <span className={`stmt-rank ${rank <= 3 ? "stmt-rank-top" : ""}`}>
+            #{rank}
+          </span>
           <span className="sql-summary">
             {query.object_name || query.text || query.id}
           </span>
-          <ArrowUpRight size={13} className="stmt-inspect-icon" />
+          <span className="stmt-inspect-cue">
+            Inspect <ArrowUpRight size={12} />
+          </span>
         </button>
         <div className="statement-badges">
           {topWait && (
@@ -96,25 +102,31 @@ function StatementRow({
           )}
         </div>
       </td>
-      <td>
+      <td className="num-col metric-primary-cell">
         <div className="query-bar-stack">
-          <div className="query-bar">
-            <div className="track" aria-hidden="true">
-              <i
-                style={{
-                  width: `${maximum > 0 ? (100 * val) / maximum : 0}%`,
-                }}
-              />
-            </div>
+          <div className="metric-val-row">
             <strong>{quantity(val)}</strong>
+            {share !== null && (
+              <span className="metric-share-pill">{pct(share)}</span>
+            )}
           </div>
-          {share !== null && <small>{pct(share)} share</small>}
+          <div className="track metric-bar-track" aria-hidden="true">
+            <i className={barTone} style={{ width: `${barPct}%` }} />
+          </div>
         </div>
       </td>
-      <td>{quantity(query.mean_time_ms)}</td>
-      <td>{quantity(query.executions)}</td>
-      <td>{quantity(query.cpu_time_ms)}</td>
-      <td>{quantity(query.logical_reads)}</td>
+      <td className={`num-col ${metric === "mean_time_ms" ? "is-sorted-col" : ""}`}>
+        {quantity(query.mean_time_ms)}
+      </td>
+      <td className={`num-col ${metric === "executions" ? "is-sorted-col" : ""}`}>
+        {quantity(query.executions)}
+      </td>
+      <td className={`num-col ${metric === "cpu_time_ms" ? "is-sorted-col" : ""}`}>
+        {quantity(query.cpu_time_ms)}
+      </td>
+      <td className={`num-col ${metric === "logical_reads" ? "is-sorted-col" : ""}`}>
+        {quantity(query.logical_reads)}
+      </td>
     </tr>
   );
 }
@@ -240,15 +252,23 @@ function Population({
       )}
       {queries.length ? (
         <div className="table-scroll">
-          <table>
+          <table className="workload-table">
+            <colgroup>
+              <col className="col-stmt" />
+              <col className="col-primary-metric" />
+              <col className="col-num" />
+              <col className="col-num" />
+              <col className="col-num" />
+              <col className="col-num" />
+            </colgroup>
             <thead>
               <tr>
                 <th>{w.statement}</th>
-                <th>{metrics[metric]}</th>
-                <th>{w.meanTime}</th>
-                <th>{w.calls}</th>
-                <th>{w.cpuTime}</th>
-                <th>{w.logicalReads}</th>
+                <th className="num-col">{metrics[metric]}</th>
+                <th className="num-col">{w.meanTime}</th>
+                <th className="num-col">{w.calls}</th>
+                <th className="num-col">{w.cpuTime}</th>
+                <th className="num-col">{w.logicalReads}</th>
               </tr>
             </thead>
             <tbody>
