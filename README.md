@@ -11,6 +11,7 @@
 [![Demo](https://img.shields.io/github/actions/workflow/status/culpritsql/culprit-web/pages.yml?branch=main&style=flat-square&label=live%20demo&labelColor=181715)](https://culpritsql.github.io/culprit-web/)
 [![Archive reader](https://img.shields.io/badge/archive-Culprit-ffcf33?style=flat-square&labelColor=181715)](https://github.com/culpritsql/culprit-sql-studio)
 [![Self hosted](https://img.shields.io/badge/self--hosted-OIDC%20%2B%20MCP-89ad96?style=flat-square&labelColor=181715)](docs/self-hosting.md)
+[![License: MIT](https://img.shields.io/badge/license-MIT-6b93f0?style=flat-square&labelColor=181715)](LICENSE)
 
 [Fleet](#fleet) · [Investigations](#investigations) · [Historical workload](#historical-workload) · [Live demo](#try-the-demo) · [Quickstart](#quickstart)
 
