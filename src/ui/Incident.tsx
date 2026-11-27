@@ -494,26 +494,6 @@ export function Incident({
           around,
           signal,
         );
-        if (section === "incident" || section === "timeline") {
-          const windowReport = await api
-            .window(
-              connection,
-              {
-                resource,
-                window: {
-                  from: incident.report.from,
-                  until: incident.report.until,
-                },
-                as_of: incident.report.recorded_before,
-                view: "compatible-workload",
-                page_rows: pageRows,
-                after: null,
-              },
-              signal,
-            )
-            .catch(() => null);
-          return { incident, windowReport };
-        }
         return { incident, windowReport: null };
       }
       if (section !== "incident" && section !== "timeline") {
@@ -555,8 +535,54 @@ export function Incident({
   const dbScopeKey = `${connection.name}:${resource.database}`;
   const result = useRead(load, `incident:${dbScopeKey}:${section}`);
   const view = result.status === "ready" ? result.value.incident : null;
-  const windowReport =
+  const boundedWindowReport =
     result.status === "ready" ? result.value.windowReport : null;
+
+  const unboundFrom = !bounds ? (view?.report.from ?? null) : null;
+  const unboundUntil = !bounds ? (view?.report.until ?? null) : null;
+  const unboundCutoff = !bounds ? (view?.report.recorded_before ?? null) : null;
+  const wantSupplement =
+    !bounds &&
+    (section === "incident" || section === "timeline") &&
+    Boolean(unboundFrom && unboundUntil && unboundCutoff);
+
+  const loadSupplement = useCallback(
+    async (signal: AbortSignal): Promise<WarehouseWindowReport | null> => {
+      void liveTick;
+      if (!wantSupplement || !unboundFrom || !unboundUntil || !unboundCutoff) {
+        return null;
+      }
+      return api
+        .window(
+          connection,
+          {
+            resource,
+            window: { from: unboundFrom, until: unboundUntil },
+            as_of: unboundCutoff,
+            view: "compatible-workload",
+            page_rows: pageRows,
+            after: null,
+          },
+          signal,
+        )
+        .catch(() => null);
+    },
+    [
+      connection,
+      resource,
+      wantSupplement,
+      unboundFrom,
+      unboundUntil,
+      unboundCutoff,
+      pageRows,
+      liveTick,
+    ],
+  );
+
+  const suppResult = useRead(loadSupplement, `incident-supp:${dbScopeKey}`);
+  const windowReport =
+    boundedWindowReport ??
+    (suppResult.status === "ready" ? suppResult.value : null);
   const range = bounds ?? view?.report;
 
   useEffect(() => {
