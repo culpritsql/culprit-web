@@ -1,22 +1,34 @@
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { RegionalFleet } from "./RegionalFleet";
-import { Database, ChevronRight } from "lucide-react";
+import { ChevronRight, Globe2 } from "lucide-react";
+import type { WarehouseFleetRow } from "../../vendor/culprit/app/src/gen/WarehouseFleetRow";
 import {
   api,
   ExportAccess,
+  isDemoMode,
   useRead,
   type Session,
   type ArchiveAccess,
   type PublishedResourceSelector,
 } from "./api";
+import {
+  CommandPalette,
+  type PaletteDemoScenario,
+  type PaletteResource,
+} from "./CommandPalette";
+import { ArchiveScaleSwitcher } from "./SelectMenu";
 import { SavedViews } from "./SavedViews";
 import { Fleet } from "./Fleet";
-import { Incident } from "./Incident";
+import { Incident, type KnownDatabaseMeta } from "./Incident";
 import { StateMessage } from "./shared";
 import {
   archiveUrl,
   investigationUrl,
-  activeSection,
   getRange,
+  parseRoute,
+  regionsUrl,
+  spaClick,
+  useLocationHref,
 } from "./navigation";
 import w from "./en.json";
 
@@ -44,28 +56,35 @@ export function Workspace({
   regions: Record<string, string>;
   access: NonNullable<Session["access"]>;
 }) {
-  const result = useRead(api.connections);
-  if (result.status !== "ready")
-    return (
-      <StateMessage
-        error={result.status === "error" ? result.message : undefined}
-      />
-    );
-  const params = new URLSearchParams(location.search);
-  const name = params.get("archive");
+  useLocationHref();
+  const [knownResources, setKnownResources] = useState<PaletteResource[]>([]);
+  const [demoScenarios, setDemoScenarios] = useState<PaletteDemoScenario[]>([]);
+
+  useEffect(() => {
+    if (!isDemoMode()) return;
+    import("./demoMode").then((mod) => {
+      setDemoScenarios(mod.getDemoScenarios());
+      setKnownResources(mod.getDemoPaletteResources());
+    });
+  }, []);
+
+  const result = useRead(api.connections, "connections");
+  const connections = result.status === "ready" ? result.value : [];
+
+  const route = parseRoute();
+  const params = route.params;
+  const name =
+    route.kind === "archive" || route.kind === "investigate"
+      ? route.archive
+      : null;
   const revision = params.get("revision");
-  const connections = result.value;
   const fleetArchives = connections.filter(
     (item) => access.archives[item.name]?.view_fleet,
   );
   const overview =
-    !name &&
-    !revision &&
-    !params.has("database") &&
-    (params.get("view") === "regions" ||
-      (params.size === 0 && fleetArchives.length > 1));
-  if (overview)
-    return <RegionalFleet connections={fleetArchives} regions={regions} />;
+    route.kind === "regions" ||
+    (route.kind === "home" && fleetArchives.length > 1);
+
   const candidates = connections.filter((item) =>
     name ? item.name === name : item.revision === revision,
   );
@@ -75,14 +94,95 @@ export function Workspace({
         ? candidates[0]
         : undefined
       : connections[0];
+
+  const handleRowsLoaded = useCallback(
+    (rows: WarehouseFleetRow[]) => {
+      if (!connection) return;
+      const grant = access.archives[connection.name];
+      if (!grant) return;
+      const mapped: PaletteResource[] = rows
+        .filter((r) => mayInspect(grant, r.selector))
+        .map((r) => ({
+          name: r.database_name,
+          engine: r.engine,
+          environment: r.environment,
+          archive: connection,
+          selector: r.selector,
+          around: r.latest_observed_until ?? r.latest_collected_until,
+        }));
+      setKnownResources((prev) => {
+        const filtered = prev.filter(
+          (item) => item.archive.name !== connection.name,
+        );
+        return [...filtered, ...mapped];
+      });
+    },
+    [connection, access.archives],
+  );
+
+  const nsParam = params.get("namespace") ?? "";
+  const dbParam = params.get("database") ?? "";
+  const resource = useMemo(
+    () => ({
+      namespace_id: nsParam,
+      database: dbParam,
+    }),
+    [nsParam, dbParam],
+  );
+
+  const knownMeta = useMemo<KnownDatabaseMeta | null>(() => {
+    if (!connection) return null;
+    const hit = knownResources.find(
+      (r) =>
+        r.archive.name === connection.name &&
+        r.selector.namespace_id === resource.namespace_id &&
+        r.selector.database === resource.database,
+    );
+    if (hit) {
+      return {
+        name: hit.name,
+        engine: hit.engine,
+        environment: hit.environment,
+      };
+    }
+    const grantRes = access.archives[connection.name]?.resources.find(
+      (r) =>
+        r.selector.namespace_id === resource.namespace_id &&
+        r.selector.database === resource.database,
+    );
+    if (grantRes) {
+      return { name: grantRes.label, engine: null, environment: null };
+    }
+    return null;
+  }, [connection, knownResources, resource, access.archives]);
+
+  if (result.status !== "ready")
+    return (
+      <StateMessage
+        error={result.status === "error" ? result.message : undefined}
+      />
+    );
+
+  const investigating = route.kind === "investigate";
+
+  if (overview) {
+    return (
+      <>
+        <CommandPalette
+          connections={fleetArchives}
+          regions={regions}
+          knownResources={knownResources}
+          investigating={false}
+          demoScenarios={demoScenarios}
+        />
+        <RegionalFleet connections={fleetArchives} regions={regions} />
+      </>
+    );
+  }
+
   if (!connection || !Object.hasOwn(access.archives, connection.name))
     return <StateMessage error={w.badLink} />;
   const grant = access.archives[connection.name];
-  const resource = {
-    namespace_id: params.get("namespace") ?? "",
-    database: params.get("database") ?? "",
-  };
-  const investigating = params.has("database");
   const selectedRange = getRange(params);
   if (selectedRange === "invalid")
     return <StateMessage error={w.invalidRange} />;
@@ -106,42 +206,49 @@ export function Workspace({
         r.selector.namespace_id === resource.namespace_id &&
         r.selector.database === resource.database,
     );
+
   return (
     <ExportAccess.Provider value={investigating && allowExport}>
+      <CommandPalette
+        connections={fleetArchives}
+        regions={regions}
+        knownResources={knownResources}
+        investigating={investigating}
+        demoScenarios={demoScenarios}
+      />
       <nav className="crumb" aria-label={w.workspace}>
         {fleetArchives.length > 1 && (
           <>
-            <a href="/?view=regions">{w.regionalFleet}</a>
-            <ChevronRight size={13} />
+            <a className="crumb-link" href={regionsUrl()} onClick={spaClick}>
+              <Globe2 size={13} />
+              <span>{w.regionalFleet}</span>
+            </a>
+            <ChevronRight size={13} className="crumb-sep" />
           </>
         )}
-        <Database size={15} />
-        {connections.length > 1 ? (
-          <select
-            aria-label={w.archive}
-            value={connection.name}
-            onChange={(e) => location.assign(archiveUrl(e.target.value))}
-          >
-            {connections.map((c) => (
-              <option key={c.name} value={c.name}>
-                {regions[c.name] ? regions[c.name] + " · " : ""}
-                {c.name}
-              </option>
-            ))}
-          </select>
-        ) : (
-          <span>
-            {regions[connection.name] ? regions[connection.name] + " · " : ""}
-            {connection.name}
-          </span>
-        )}
-        <ChevronRight size={13} />
-        <a href={archiveUrl(connection.name)}>{w.fleet}</a>
-        {investigating && (
+        <ArchiveScaleSwitcher
+          current={connection}
+          connections={connections}
+          regions={regions}
+          showRegionsLink={fleetArchives.length > 1}
+        />
+        <ChevronRight size={13} className="crumb-sep" />
+        {investigating ? (
           <>
-            <ChevronRight size={13} />
-            {w.progress}
+            <a
+              className="crumb-link"
+              href={archiveUrl(connection.name)}
+              onClick={spaClick}
+            >
+              {w.fleet}
+            </a>
+            <ChevronRight size={13} className="crumb-sep" />
+            <span className="crumb-current">
+              {knownMeta?.name ?? w.progress}
+            </span>
           </>
+        ) : (
+          <span className="crumb-current">{w.fleet}</span>
         )}
         {savedEnabled && (
           <SavedViews
@@ -152,7 +259,7 @@ export function Workspace({
                     resource,
                     around,
                     bounds: selectedRange,
-                    view: activeSection(params),
+                    view: route.section,
                     incident: params.get("incident"),
                   }
                 : null
@@ -167,16 +274,20 @@ export function Workspace({
           around={new Date(around).toISOString()}
           revisionId={params.get("incident")}
           bounds={selectedRange}
+          knownMeta={knownMeta}
         />
       ) : grant.view_fleet ? (
         <Fleet
           connection={connection}
           canInspect={(r) => mayInspect(grant, r)}
+          onRowsLoaded={handleRowsLoaded}
         />
       ) : (
         <>
           <header className="page-head">
-            <h1>{w.assigned}</h1>
+            <div>
+              <h1>{w.assigned}</h1>
+            </div>
           </header>
           <section className="panel resource-list">
             {grant.resources.map((row) => (
@@ -188,6 +299,7 @@ export function Workspace({
                       row.selector,
                       new Date().toISOString(),
                     )}
+                    onClick={spaClick}
                   >
                     {row.label}
                     <ChevronRight size={15} />

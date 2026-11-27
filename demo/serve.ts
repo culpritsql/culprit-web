@@ -1,8 +1,13 @@
 // Local sample data for the production UI. This entry point is excluded from the web image.
 import { resolve, sep } from "node:path";
-import { archives, emptyIncidentView, fleet, sampleWindow } from "./archives";
-import { resource, view } from "./estate";
-import { warehouseArtifactCase } from "../vendor/culprit/app/src/test/warehouse-artifacts";
+import {
+  archives,
+  computeDemoPlanDiff,
+  fleet,
+  incidentForResource,
+  sampleArtifacts,
+  sampleWindow,
+} from "./archives";
 
 const access = {
   view_fleet: true,
@@ -19,9 +24,12 @@ async function asset(pathname: string) {
   if (!path.startsWith(staticRoot + sep))
     return new Response(null, { status: 404 });
   const file = Bun.file(path);
-  return (await file.exists())
-    ? new Response(file)
-    : new Response(null, { status: 404 });
+  if (await file.exists()) return new Response(file);
+  if (!pathname.includes(".")) {
+    const index = Bun.file(resolve(staticRoot, "./index.html"));
+    if (await index.exists()) return new Response(index);
+  }
+  return new Response(null, { status: 404 });
 }
 function json(value: unknown) {
   return new Response(
@@ -42,6 +50,16 @@ const server = Bun.serve({
   async fetch(req) {
     const url = new URL(req.url);
     if (req.method === "GET") {
+      if (url.pathname === "/.well-known/oauth-protected-resource")
+        return json({
+          resource: url.origin + "/mcp",
+          authorization_servers: [
+            "https://login.microsoftonline.com/common/v2.0",
+          ],
+          bearer_methods_supported: ["header"],
+          scopes_supported: ["openid", "profile"],
+          resource_name: "Culprit Fleet Archive MCP (Local Demo)",
+        });
       if (url.pathname === "/api/session")
         return json({
           access: {
@@ -50,7 +68,7 @@ const server = Bun.serve({
           regions: Object.fromEntries(archives.map((a) => [a.name, a.region])),
           providers: [],
           saved_views_enabled: false,
-          read_defaults: { window_page_rows: 50, artifact_chunk_chars: 4096 },
+          read_defaults: { window_page_rows: 8, artifact_chunk_chars: 4096 },
         });
       if (url.pathname === "/api/archive/connections")
         return json(
@@ -65,6 +83,97 @@ const server = Bun.serve({
     if (url.pathname === "/auth/logout")
       return Response.redirect(url.origin, 303);
     const body = await req.json();
+    if (url.pathname === "/mcp") {
+      const id = body.id ?? 1;
+      if (body.method === "initialize") {
+        return json({
+          jsonrpc: "2.0",
+          id,
+          result: {
+            protocolVersion: "2025-03-26",
+            capabilities: { tools: {} },
+            serverInfo: { name: "culprit-web-mcp", version: "0.1.0" },
+          },
+        });
+      }
+      if (body.method === "tools/list") {
+        return json({
+          jsonrpc: "2.0",
+          id,
+          result: {
+            tools: [
+              { name: "list_archives", description: "List authorized scale units and regions." },
+              { name: "fleet_overview", description: "Query fleet health, incidents, CPU/Memory and silent targets." },
+              { name: "investigate_incident", description: "Inspect root cause, blocker session, SQL and fix." },
+              { name: "query_database_window", description: "Read Top SQL, waits, deadlocks or ranked schema/index fixes." },
+              { name: "diff_execution_plans", description: "Parse and diff two native execution plans." },
+            ],
+          },
+        });
+      }
+      if (body.method === "tools/call") {
+        const name = body.params?.name;
+        if (name === "list_archives") {
+          return json({
+            jsonrpc: "2.0",
+            id,
+            result: {
+              content: [
+                {
+                  type: "text",
+                  text: JSON.stringify(
+                    archives.map((a) => ({
+                      archive: a.name,
+                      region: a.region,
+                      databases: a.rows.length,
+                    })),
+                    null,
+                    2,
+                  ),
+                },
+              ],
+            },
+          });
+        }
+        const us = archives[0]!;
+        const rep = fleet(us, {
+          as_of: "2026-10-11T12:14:00.000Z",
+          window: null,
+          max_age_seconds: 3600,
+          page_rows: 8,
+          after: null,
+          sort: "attention",
+          filter: {
+            environment: null,
+            engine: null,
+            attention_only: true,
+            shared_group: null,
+          },
+        });
+        return json({
+          jsonrpc: "2.0",
+          id,
+          result: {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify(
+                  { archive: us.name, summary: rep.summary, rows: rep.rows.length },
+                  null,
+                  2,
+                ),
+              },
+            ],
+          },
+        });
+      }
+      return json({ jsonrpc: "2.0", id, result: {} });
+    }
+    if (url.pathname === "/api/plans/diff") {
+      return json(
+        computeDemoPlanDiff(body.a, body.b, body.nameA, body.nameB),
+      );
+    }
     const archive = archives.find(
       (a) =>
         a.name === body.connection?.name &&
@@ -75,33 +184,14 @@ const server = Bun.serve({
     switch (url.pathname) {
       case "/api/archive/fleet":
         return json(fleet(archive, body.request));
-      case "/api/archive/incident": {
-        return json(
-          archive.checkout && body.resource.database === resource.database
-            ? view
-            : emptyIncidentView,
-        );
-      }
+      case "/api/archive/incident":
+        return json(incidentForResource(archive, body.resource.database));
       case "/api/archive/window":
         return json(sampleWindow(archive, body.request));
       case "/api/archive/artifacts": {
-        if (
-          !archive.checkout ||
-          body.request.resource.database !== resource.database
-        )
-          return new Response(null, { status: 404 });
-        const report = warehouseArtifactCase(body.request);
-        for (const record of report.records)
-          for (const item of record.artifacts) {
-            if (
-              item.payload.kind === "complete" &&
-              item.payload.payload.state === "available"
-            )
-              item.payload.payload.text =
-                "UPDATE checkout.orders SET status = @status WHERE id = @order_id";
-          }
-        report.qualifications = ["Sample original from the demo estate."];
-        return json(report);
+        const res = sampleArtifacts(archive, body.request);
+        if (!res) return new Response(null, { status: 404 });
+        return json(res);
       }
       default:
         return new Response(null, { status: 404 });

@@ -1,6 +1,9 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import {
   createArchiveClient,
+  createArchivePlanClient,
+  type Plan,
+  type PlanDiff,
   type PublishedResourceSelector,
   type WarehouseArtifactQuery,
   type WarehouseArtifactReport,
@@ -9,11 +12,22 @@ import {
 } from "../../vendor/culprit/packages/culprit-archive-client/src";
 import words from "./en.json";
 export type {
+  Plan,
+  PlanDiff,
   WarehouseConnectionRef,
   WarehouseFleetRequest,
   PublishedResourceSelector,
 };
 import type { Section, ArchiveRange } from "./navigation";
+
+export function isDemoMode(): boolean {
+  if (import.meta.env.VITE_DEMO_MODE === "true") return true;
+  if (typeof window !== "undefined") {
+    return new URLSearchParams(window.location.search).get("demo") === "1";
+  }
+  return false;
+}
+
 export type ArchiveScope = {
   connection: WarehouseConnectionRef;
   resource: PublishedResourceSelector;
@@ -46,7 +60,12 @@ export interface Session {
   saved_views_enabled: boolean;
   read_defaults: { window_page_rows: number; artifact_chunk_chars: number };
   access: { archives: Record<string, ArchiveAccess> } | null;
-  providers: { id: string; label: string }[];
+  providers: {
+    id: string;
+    label: string;
+    issuer?: string;
+    client_id?: string;
+  }[];
 }
 
 export const ReadDefaults = createContext<Session["read_defaults"] | null>(
@@ -64,6 +83,11 @@ async function request<T>(
   body?: unknown,
   method = body === undefined ? "GET" : "POST",
 ): Promise<T> {
+  if (isDemoMode()) {
+    const mod = await import("./demoMode");
+    if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
+    return mod.demoRequest<T>(method, path, body);
+  }
   const response = await fetch(path, {
     method,
     signal,
@@ -86,9 +110,15 @@ async function request<T>(
   return response.json() as Promise<T>;
 }
 
-const archive = createArchiveClient((method, path, body, signal) =>
-  request(path, signal, body, method),
-);
+const transport = <T,>(
+  method: "GET" | "POST",
+  path: string,
+  body?: unknown,
+  signal?: AbortSignal,
+) => request<T>(path, signal, body, method);
+
+const archive = createArchiveClient(transport);
+const plans = createArchivePlanClient(transport);
 
 export const api = {
   saved: (signal: AbortSignal) =>
@@ -115,35 +145,68 @@ export const api = {
   incident: archive.warehouseIncident,
   window: archive.warehouseWindow,
   artifacts: archive.warehouseArtifacts,
+  parsePlan: plans.parsePlan,
+  diffPlans: plans.diffPlans,
+  exportPlan: plans.exportPlan,
+  exportDiff: plans.exportDiff,
+  mcp: (body: unknown, signal?: AbortSignal) =>
+    request<Record<string, unknown>>("/mcp", signal, body, "POST"),
 };
 
-type Load<T> =
-  | { status: "loading" }
-  | { status: "ready"; value: T }
-  | { status: "error"; message: string };
-export function useRead<T>(load: (signal: AbortSignal) => Promise<T>): Load<T> {
+export type Load<T> =
+  | { status: "loading"; refreshing?: false }
+  | { status: "ready"; value: T; refreshing: boolean }
+  | { status: "error"; message: string; refreshing?: false };
+
+/**
+ * Reads an async resource. Passing `scopeKey` enables stale-while-revalidate
+ * within the same entity scope so filter/sort/page/refresh updates never
+ * collapse DOM height or jump scroll position to top.
+ */
+export function useRead<T>(
+  load: (signal: AbortSignal) => Promise<T>,
+  scopeKey?: string,
+): Load<T> {
   const [result, setResult] = useState<{
     load: typeof load;
+    scopeKey: string | undefined;
     data: Load<T>;
   } | null>(null);
+
   useEffect(() => {
     const controller = new AbortController();
     load(controller.signal)
       .then((value) => {
-        if (!controller.signal.aborted)
-          setResult({ load, data: { status: "ready", value } });
-      })
-      .catch((err: unknown) => {
-        if (!controller.signal.aborted)
+        if (!controller.signal.aborted) {
           setResult({
             load,
+            scopeKey,
+            data: { status: "ready", value, refreshing: false },
+          });
+        }
+      })
+      .catch((err: unknown) => {
+        if (!controller.signal.aborted) {
+          setResult({
+            load,
+            scopeKey,
             data: {
               status: "error",
               message: err instanceof Error ? err.message : words.error,
             },
           });
+        }
       });
     return () => controller.abort();
-  }, [load]);
-  return result?.load === load ? result.data : { status: "loading" };
+  }, [load, scopeKey]);
+
+  if (result?.load === load) return result.data;
+  if (
+    scopeKey !== undefined &&
+    result?.scopeKey === scopeKey &&
+    result.data.status === "ready"
+  ) {
+    return { status: "ready", value: result.data.value, refreshing: true };
+  }
+  return { status: "loading" };
 }

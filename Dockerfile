@@ -4,6 +4,9 @@ COPY package.json bun.lock ./
 RUN bun install --frozen-lockfile
 COPY vendor/culprit/packages/culprit-archive-client/src vendor/culprit/packages/culprit-archive-client/src
 COPY vendor/culprit/app/src/gen vendor/culprit/app/src/gen
+COPY vendor/culprit/app/src/lib/rust-json.ts vendor/culprit/app/src/lib/rust-json.ts
+COPY vendor/culprit/app/src/test vendor/culprit/app/src/test
+COPY vendor/culprit/fixtures/mssql-demo.report.json vendor/culprit/fixtures/incident-history.sample.json vendor/culprit/fixtures/
 COPY vendor/culprit/docs/images/logo.svg vendor/culprit/docs/images/logo.svg
 COPY src/ui src/ui
 COPY index.html vite.config.ts tsconfig.json ./
@@ -19,6 +22,15 @@ RUN cargo build --locked --release
 
 FROM amazon/aws-cli:2.31.10@sha256:c3545440ffb85aac40c104d7fe5cb885d0ed26e91d95a433094a9dba9ddfacd6 AS aws
 FROM debian:bookworm-slim@sha256:734a72b3d6142a71993b4bc580ca01d8ca687f77a2c422d96a961d3376b179bc
+ARG OCI_SOURCE=https://github.com/culpritsql/culprit-web
+ARG OCI_VERSION=0.1.0
+ARG OCI_REVISION=unknown
+LABEL org.opencontainers.image.title="Culprit Web" \
+      org.opencontainers.image.description="Self-hosted database fleet command center, archive time-machine, and Entra ID MCP server" \
+      org.opencontainers.image.source="${OCI_SOURCE}" \
+      org.opencontainers.image.version="${OCI_VERSION}" \
+      org.opencontainers.image.revision="${OCI_REVISION}" \
+      org.opencontainers.image.licenses="MIT"
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/* && install -d -o 65532 -g 65532 /var/lib/culprit-web
 COPY --from=aws /usr/local/aws-cli /usr/local/aws-cli
 RUN ln -s /usr/local/aws-cli/v2/current/bin/aws /usr/local/bin/aws

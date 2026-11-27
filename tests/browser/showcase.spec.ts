@@ -59,19 +59,22 @@ for (const theme of ["light", "dark"] as const) {
       ).toBeVisible();
       await capture("workload");
       await page.locator(".statement-toggle").first().click();
+      const drawer = page.getByRole("dialog", { name: "Statement inspector" });
+      await expect(drawer).toBeVisible();
       await expect(
-        page.getByRole("heading", { name: "Recorded waits" }).first(),
+        drawer.getByRole("heading", { name: "Recorded waits" }),
       ).toBeVisible();
       await expect(
-        page.getByRole("heading", { name: "Runtime by plan" }).first(),
+        drawer.getByRole("heading", { name: "Runtime by plan" }),
       ).toBeVisible();
-      await page
-        .getByText("Captured execution plan", { exact: true })
-        .first()
+      await drawer
+        .getByRole("button", { name: "Captured execution plan" })
         .click();
-      await expect(
-        page.locator(".statement-detail details[open] svg").first(),
-      ).toBeVisible();
+      await expect(drawer.locator(".drawer-plan-stage svg").first()).toBeVisible();
+      await drawer
+        .getByRole("button", { name: "Close statement inspector" })
+        .click();
+      await expect(drawer).toHaveCount(0);
       const chart = page
         .getByRole("slider", { name: "Selected interval" })
         .first();

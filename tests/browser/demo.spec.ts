@@ -32,11 +32,10 @@ for (const theme of ["light", "dark"] as const) {
       await expect(
         page.getByRole("heading", { name: "Top SQL" }),
       ).toBeVisible();
-      await page
-        .getByLabel("Archive", { exact: true })
-        .selectOption("eu-production");
+      await page.getByRole("button", { name: "Archive", exact: true }).click();
+      await page.getByRole("option", { name: /eu-production/ }).click();
       await page.getByRole("link", { name: "Checkout", exact: true }).click();
-      await expect(page).toHaveURL(/archive=eu-production/);
+      await expect(page).toHaveURL(/\/archives\/eu-production\//);
       await expect(
         page.getByText("Checkout requests waited on an open transaction"),
       ).toHaveCount(0);

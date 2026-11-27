@@ -1,5 +1,7 @@
 import { lazy, Suspense, useState } from "react";
 import type { Plan } from "../../vendor/culprit/app/src/gen/Plan";
+import type { QueryStat } from "../../vendor/culprit/app/src/gen/QueryStat";
+import { useTheme } from "./themes";
 import w from "./en.json";
 
 const Viewer = lazy(async () => {
@@ -12,18 +14,24 @@ const Viewer = lazy(async () => {
 
 export function CapturedPlan({
   plan,
+  query,
   label = w.executionPlan,
 }: {
   plan: Plan;
+  query?: QueryStat;
   label?: string;
 }) {
   const [open, setOpen] = useState(false);
+  const { colorMode } = useTheme();
   return (
-    <details onToggle={(event) => setOpen(event.currentTarget.open)}>
+    <details
+      className="captured-plan-details"
+      onToggle={(event) => setOpen(event.currentTarget.open)}
+    >
       <summary>{label}</summary>
       {open && (
         <Suspense fallback={<p role="status">{w.loading}</p>}>
-          <Viewer plan={plan} />
+          <Viewer plan={plan} query={query} theme={colorMode} />
         </Suspense>
       )}
     </details>

@@ -1,0 +1,272 @@
+name: Web OCI & Helm Publish
+
+# Builds UI bundle + native x86_64 and ARM64 binaries, smoke-tests Helm & entrypoints, and publishes:
+#   - Multi-arch OCI web image: ghcr.io/culpritsql/culprit-web (linux/amd64, linux/arm64)
+#   - OCI Helm chart:           oci://ghcr.io/culpritsql/charts/culprit-web
+#
+# On pushes to `main`: publishes `:sha-<short>`, `:main`, and chart version `<version>-sha.<short>`.
+# On `v*` release tags (or manual `release_tag` dispatch): publishes `:vX.Y.Z`, `:X.Y`, `:latest`, `:sha-<short>`,
+# and chart version `X.Y.Z`.
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Existing v* tag to rebuild and publish (blank publishes current ref)"
+        required: false
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: web-publish-${{ inputs.release_tag && format('refs/tags/{0}', inputs.release_tag) || github.ref }}
+  cancel-in-progress: ${{ github.ref == 'refs/heads/main' && inputs.release_tag == '' }}
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  source:
+    name: Resolve web version & build UI
+    runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.source.outputs.sha }}
+      short_sha: ${{ steps.source.outputs.short_sha }}
+      version: ${{ steps.source.outputs.version }}
+      major_minor: ${{ steps.source.outputs.major_minor }}
+      tag: ${{ steps.source.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_tag && format('refs/tags/{0}', inputs.release_tag) || github.sha }}
+          submodules: true
+          persist-credentials: false
+      - id: source
+        name: Verify Cargo, package.json, and Helm chart versions agree
+        env:
+          REQUESTED_TAG: ${{ inputs.release_tag }}
+          EVENT_REF: ${{ github.ref }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          python3 - <<'PYTHON'
+          import json, os, re, subprocess, tomllib
+          from pathlib import Path
+
+          tag = os.environ["REQUESTED_TAG"].strip()
+          if not tag and os.environ["EVENT_NAME"] == "push" and os.environ["EVENT_REF"].startswith("refs/tags/v"):
+              tag = os.environ["EVENT_REF"].removeprefix("refs/tags/")
+
+          cargo_ver = tomllib.loads(Path("Cargo.toml").read_text())["package"]["version"]
+          pkg_ver = json.loads(Path("package.json").read_text())["version"]
+          chart_text = Path("charts/culprit-web/Chart.yaml").read_text()
+          chart_ver = re.search(r"^version:\s*(\S+)\s*$", chart_text, re.M).group(1).strip("\"'")
+          chart_app_ver = re.search(r"^appVersion:\s*(\S+)\s*$", chart_text, re.M).group(1).strip("\"'")
+
+          versions = {cargo_ver, pkg_ver, chart_ver, chart_app_ver}
+          if len(versions) != 1:
+              raise SystemExit(
+                  f"Version mismatch across Cargo ({cargo_ver}), package.json ({pkg_ver}), "
+                  f"Chart ({chart_ver}/{chart_app_ver})"
+              )
+          if tag and tag != f"v{cargo_ver}":
+              raise SystemExit(f"Release tag {tag} does not match Cargo version v{cargo_ver}")
+
+          major_minor = ".".join(cargo_ver.split(".")[:2])
+          sha = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
+          short_sha = sha[:12]
+          with open(os.environ["GITHUB_OUTPUT"], "a") as out:
+              out.write(
+                  f"sha={sha}\nshort_sha={short_sha}\nversion={cargo_ver}\n"
+                  f"major_minor={major_minor}\ntag={tag}\n"
+              )
+          print(f"Resolved culprit-web source {sha} (v{cargo_ver}, tag={tag or 'main'})")
+          PYTHON
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - name: Build production UI bundle
+        run: bun install --frozen-lockfile && bun run build
+      - name: Lint and validate Helm chart defaults and overrides
+        run: |
+          helm lint charts/culprit-web --set config.existingConfigMap=workspace
+          helm lint charts/culprit-web --set image=local/culprit-web:test --set config.existingConfigMap=workspace
+          helm template checks charts/culprit-web --set config.existingConfigMap=workspace --set ingress.enabled=true --set ingress.host=fleet.example.com > /dev/null
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web-ui-dist
+          path: dist
+          if-no-files-found: error
+          retention-days: 3
+
+  build:
+    name: Build native binary (${{ matrix.arch }})
+    needs: [source]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            os: ubuntu-22.04
+          - arch: arm64
+            os: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.source.outputs.sha }}
+          submodules: true
+          persist-credentials: false
+      - name: Install stable Rust (amd64)
+        if: matrix.arch == 'amd64'
+        run: rustup update stable && rustup default stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: web-oci-${{ matrix.arch }}
+          cache-on-failure: true
+      - name: Build Linux amd64 culprit-web binary (Ubuntu 22.04 glibc baseline)
+        if: matrix.arch == 'amd64'
+        env:
+          CARGO_PROFILE_RELEASE_LTO: thin
+          CARGO_PROFILE_RELEASE_CODEGEN_UNITS: 16
+        run: cargo build --locked --release
+      - name: Build Linux arm64 culprit-web binary (Debian bookworm glibc baseline)
+        if: matrix.arch == 'arm64'
+        run: |
+          if ! sudo swapon --show | grep -q '/'; then
+            sudo fallocate -l 4G /swapfile
+            sudo chmod 600 /swapfile
+            sudo mkswap /swapfile
+            sudo swapon /swapfile
+          fi
+          mkdir -p "$HOME/.cargo/registry" "$HOME/.cargo/git" target
+          docker run --rm \
+            --user "$(id -u):$(id -g)" \
+            -v "$PWD":/work \
+            -w /work \
+            -v "$HOME/.cargo/registry":/usr/local/cargo/registry \
+            -v "$HOME/.cargo/git":/usr/local/cargo/git \
+            -e CARGO_TARGET_DIR=/work/target \
+            -e CARGO_PROFILE_RELEASE_LTO=thin \
+            -e CARGO_PROFILE_RELEASE_CODEGEN_UNITS=16 \
+            -e CARGO_TERM_COLOR=always \
+            rust:1-bookworm \
+            cargo build --locked --release
+      - name: Stage ${{ matrix.arch }} binary
+        run: |
+          mkdir -p staged
+          cp target/release/culprit-web "staged/culprit-web-${{ matrix.arch }}"
+          chmod 0755 "staged/culprit-web-${{ matrix.arch }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web-binary-${{ matrix.arch }}
+          path: staged/culprit-web-${{ matrix.arch }}
+          if-no-files-found: error
+          retention-days: 3
+
+  publish:
+    name: Publish multi-arch GHCR image & OCI Helm chart
+    needs: [source, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.source.outputs.sha }}
+          submodules: true
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: web-ui-dist
+          path: context-stage/dist
+      - uses: actions/download-artifact@v4
+        with:
+          name: web-binary-amd64
+          path: context-stage
+      - uses: actions/download-artifact@v4
+        with:
+          name: web-binary-arm64
+          path: context-stage
+      - name: Build and push multi-arch culprit-web image and OCI Helm chart to GHCR
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO_OWNER: ${{ github.repository_owner }}
+          SOURCE_URL: https://github.com/${{ github.repository }}
+          SHA: ${{ needs.source.outputs.sha }}
+          SHORT_SHA: ${{ needs.source.outputs.short_sha }}
+          VERSION: ${{ needs.source.outputs.version }}
+          MAJOR_MINOR: ${{ needs.source.outputs.major_minor }}
+          TAG: ${{ needs.source.outputs.tag }}
+        run: |
+          set -euo pipefail
+          OWNER_LC="$(printf '%s' "$REPO_OWNER" | tr '[:upper:]' '[:lower:]')"
+          IMAGE_REPO="ghcr.io/${OWNER_LC}/culprit-web"
+          CHART_OCI_PREFIX="oci://ghcr.io/${OWNER_LC}/charts"
+
+          cp vendor/culprit/LICENSE context-stage/upstream-LICENSE
+          cp deploy/Dockerfile.release context-stage/Dockerfile
+          chmod 0555 context-stage/culprit-web-amd64 context-stage/culprit-web-arm64
+          chmod 0444 context-stage/upstream-LICENSE
+
+          printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          printf '%s' "$GHCR_TOKEN" | helm registry login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+
+          docker buildx create --name culprit-web-multiarch --driver docker-container --use
+          trap 'docker buildx rm culprit-web-multiarch >/dev/null 2>&1 || true; docker logout ghcr.io >/dev/null 2>&1 || true; helm registry logout ghcr.io >/dev/null 2>&1 || true' EXIT
+
+          TAGS=("-t" "${IMAGE_REPO}:sha-${SHORT_SHA}")
+          if [ -n "$TAG" ]; then
+            TAGS+=("-t" "${IMAGE_REPO}:${TAG}" "-t" "${IMAGE_REPO}:${MAJOR_MINOR}" "-t" "${IMAGE_REPO}:latest")
+            CHART_VERSION="${VERSION}"
+          else
+            TAGS+=("-t" "${IMAGE_REPO}:main")
+            CHART_VERSION="${VERSION}-sha.${SHORT_SHA}"
+          fi
+
+          METADATA_FILE="$RUNNER_TEMP/image-metadata.json"
+          docker buildx build \
+            --platform linux/amd64,linux/arm64 \
+            --provenance=mode=max \
+            --sbom=true \
+            --build-arg "OCI_SOURCE=${SOURCE_URL}" \
+            --build-arg "OCI_VERSION=${VERSION}" \
+            --build-arg "OCI_REVISION=${SHA}" \
+            "${TAGS[@]}" \
+            --metadata-file "$METADATA_FILE" \
+            --push \
+            context-stage
+
+          DIGEST="$(jq -r '."containerimage.digest"' "$METADATA_FILE")"
+          [ -n "$DIGEST" ] && [ "$DIGEST" != "null" ]
+          docker buildx imagetools inspect "${IMAGE_REPO}@${DIGEST}"
+
+          helm lint charts/culprit-web --set config.existingConfigMap=workspace
+          mkdir -p "$RUNNER_TEMP/charts"
+          helm package charts/culprit-web \
+            --version "$CHART_VERSION" \
+            --app-version "$VERSION" \
+            --destination "$RUNNER_TEMP/charts"
+          CHART_ARCHIVE="$RUNNER_TEMP/charts/culprit-web-${CHART_VERSION}.tgz"
+          helm push "$CHART_ARCHIVE" "$CHART_OCI_PREFIX"
+
+          {
+            echo "## Published Culprit Web Artifacts"
+            echo ""
+            echo "| Artifact | Reference |"
+            echo "|---|---|"
+            echo "| Multi-arch OCI Image (digest) | \`${IMAGE_REPO}@${DIGEST}\` |"
+            echo "| Commit Image Tag | \`${IMAGE_REPO}:sha-${SHORT_SHA}\` |"
+            if [ -n "$TAG" ]; then
+              echo "| Release Image Tags | \`${IMAGE_REPO}:${TAG}\`, \`${IMAGE_REPO}:${MAJOR_MINOR}\`, \`${IMAGE_REPO}:latest\` |"
+            else
+              echo "| Branch Image Tag | \`${IMAGE_REPO}:main\` |"
+            fi
+            echo "| OCI Helm Chart | \`${CHART_OCI_PREFIX}/culprit-web:${CHART_VERSION}\` |"
+          } >> "$GITHUB_STEP_SUMMARY"

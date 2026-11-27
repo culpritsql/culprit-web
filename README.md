@@ -4,28 +4,30 @@
 
 # Culprit Web
 
-**Investigate a database incident after the database has recovered.**
+**Database fleet command center and archive time-machine — investigate incidents, resource spikes, plan regressions and deadlocks even after the database has recovered.**
 
 [![Checks](https://img.shields.io/github/actions/workflow/status/culpritsql/culprit-web/check.yml?branch=main&style=flat-square&label=checks&labelColor=181715)](https://github.com/culpritsql/culprit-web/actions/workflows/check.yml)
+[![OCI & Helm](https://img.shields.io/github/actions/workflow/status/culpritsql/culprit-web/publish.yml?branch=main&style=flat-square&label=ghcr%20%26%20helm&labelColor=181715)](https://github.com/culpritsql/culprit-web/actions/workflows/publish.yml)
+[![Demo](https://img.shields.io/github/actions/workflow/status/culpritsql/culprit-web/pages.yml?branch=main&style=flat-square&label=live%20demo&labelColor=181715)](https://culpritsql.github.io/culprit-web/)
 [![Archive reader](https://img.shields.io/badge/archive-Culprit-ffcf33?style=flat-square&labelColor=181715)](https://github.com/culpritsql/culprit-sql-studio)
-[![Self hosted](https://img.shields.io/badge/self--hosted-OIDC-89ad96?style=flat-square&labelColor=181715)](docs/self-hosting.md)
+[![Self hosted](https://img.shields.io/badge/self--hosted-OIDC%20%2B%20MCP-89ad96?style=flat-square&labelColor=181715)](docs/self-hosting.md)
 
-[Fleet](#fleet) · [Investigations](#investigations) · [Historical workload](#historical-workload) · [Quickstart](#quickstart)
+[Fleet](#fleet) · [Investigations](#investigations) · [Historical workload](#historical-workload) · [Live demo](#try-the-demo) · [Quickstart](#quickstart)
 
 </div>
 
 ## Fleet
 
-See which databases need attention, where incidents cluster and which collectors have fallen behind. Open a database to inspect the evidence behind its counts.
+See which databases need attention across regions, monitor CPU and memory saturation, group shared compute pools and HA clusters, spot silent collector targets, and jump anywhere instantly with `⌘K`. Switch between five curated themes (**Culprit Obsidian**, **Midnight Nebula**, **Operator Terminal**, **Daylight Paper**, **Nordic Frost**) or follow your OS theme automatically.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/fleet-dark.png">
-  <img src="docs/images/fleet-light.png" alt="Fleet overview of eight sample databases, showing six active incidents and two databases with stale or partial collection" width="100%">
+  <img src="docs/images/fleet-light.png" alt="Fleet overview of eight sample databases showing active incidents, CPU and memory utilization, load sparklines and collection coverage" width="100%">
 </picture>
 
 ## Try the demo
 
-Run the sample estate locally with Bun. It opens with DBA access and uses the same React build as the self-hosted app.
+Explore the [hosted interactive demo](https://culpritsql.github.io/culprit-web/) directly in your browser (zero backend required), or run the sample estate locally with Bun:
 
 ```sh
 git clone --recurse-submodules https://github.com/culpritsql/culprit-web.git
@@ -34,7 +36,15 @@ bun install --frozen-lockfile
 bun run demo
 ```
 
-Open [Regional fleets](http://127.0.0.1:4390/?view=regions). Choose the United States, open **Checkout**, then follow the blocking incident or inspect **Workload**. Europe and Japan have separate sample fleets.
+Open [Regional fleets](http://127.0.0.1:4390/?view=regions). Choose the United States, open **Checkout**, inspect **Resources & waits** (CPU/memory curves, wait breakdown, session blocking tree and deadlock graph), or open **Workload** and click **Compare plans** on the top statement.
+
+To build the standalone static showcase bundle (used by `.github/workflows/pages.yml` for GitHub Pages / `fleet.culpritsql.com`):
+
+```sh
+bun run build:demo
+```
+
+> **Custom domain (`fleet.culpritsql.com`)**: Point a `CNAME` DNS record for `fleet.culpritsql.com` to `culpritsql.github.io`, then enter `fleet.culpritsql.com` under **Settings → Pages → Custom domain** in GitHub. Because `build:demo` uses relative asset paths (`./`) and SPA fallback (`404.html`), the same build works on both `culpritsql.github.io/culprit-web/` and `fleet.culpritsql.com/`.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/regions-dark.png">
@@ -53,11 +63,11 @@ bun run build
 cargo run --locked -- /absolute/path/to/web.json
 ```
 
-For credentials, role mappings, HTTPS and container deployment, follow the [self-hosting guide](docs/self-hosting.md). Start with the [example web configuration](config/web.example.json).
+For credentials, role mappings, HTTPS, prebuilt multi-arch `ghcr.io/culpritsql/culprit-web` containers, the `oci://ghcr.io/culpritsql/charts/culprit-web` Helm chart, and connecting coding agents via `POST /mcp` (Microsoft Entra ID / OIDC), follow the [self-hosting guide](docs/self-hosting.md). Start with the [example web configuration](config/web.example.json).
 
 ## Investigations
 
-Save a view for your next shift or share a link to the database, time window and incident revision. Follow a waiting statement to its recorded blocker, inspect the original evidence, then use the suggested verification step to check the fix. Timeline shows each recorded revision. Operations and Schema surface matching findings and changes in the selected window.
+Save a view for your next shift or share a link to the database, time window and incident revision. Correlate load spikes, CPU/memory pressure and incidents on the synchronized multi-lane timeline, follow a waiting statement to its recorded head blocker, inspect captured deadlock cycles (`@culpritsql/plan-viewer`), and open authenticated original evidence.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/investigation-dark.png">
@@ -66,11 +76,11 @@ Save a view for your next shift or share a link to the database, time window and
 
 ## Historical workload
 
-Rank statements by total time, calls or mean duration. Drag across a spike or select buckets with the keyboard to investigate that exact interval. Expand a statement to inspect recorded waits, calls and runtime by plan, and captured execution plans. Each source population keeps its own totals.
+Rank statements by total time, CPU time, logical reads, mean duration or calls, with resource-share percentages per query. Drag across a spike or select buckets with the keyboard to investigate that exact interval. Click any statement to open the wide slide-over inspector drawer with syntax-highlighted SQL, recorded waits, runtime by plan, interactive execution plan diagrams and side-by-side structural plan comparisons (`PlanViewer` and `PlanDiffViewer`).
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/workload-dark.png">
   <img src="docs/images/workload-light.png" alt="Top SQL with native Query Store intervals, statement time, calls, CPU and logical reads" width="100%">
 </picture>
 
-The screenshots use a sample estate and Culprit's SQL Server workload fixture. The native integration test separately verifies a published PostgreSQL blocker and its original SQL on ClickHouse and S3-compatible storage. The browser suite reproduces the same journey in both themes. [Development and verification](docs/development.md)
+The screenshots use a sample estate and Culprit's SQL Server workload fixture. The native integration test separately verifies a published PostgreSQL blocker and its original SQL on ClickHouse and S3-compatible storage. The browser suite reproduces the same journey across themes. [Development and verification](docs/development.md)

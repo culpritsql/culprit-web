@@ -1,17 +1,32 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { ArrowRight, LockKeyhole, LogOut } from "lucide-react";
-import { api, ReadDefaults, useRead } from "./api";
+import {
+  ArrowRight,
+  Compass,
+  LockKeyhole,
+  LogOut,
+  Search,
+  Sparkles,
+} from "lucide-react";
+import { api, isDemoMode, ReadDefaults, useRead } from "./api";
+import type { PaletteDemoScenario } from "./CommandPalette";
+import {
+  appBasePath,
+  navigate,
+  parseRoute,
+  spaClick,
+  useLocationHref,
+} from "./navigation";
+import { ThemePicker } from "./themes";
+import { LivePulseToggle } from "./livePulse";
+import { McpButton } from "./McpModal";
+import { ErrorBoundary } from "./ErrorBoundary";
 import { Workspace } from "./Workspace";
-
 import { StateMessage } from "./shared";
 import logo from "../../vendor/culprit/docs/images/logo.svg";
 import w from "./en.json";
 import "@fontsource-variable/inter";
 import "./style.css";
-
-const route = new URLSearchParams(location.search);
-const investigating = route.has("database");
 
 function loginUrl(provider: string) {
   return (
@@ -21,13 +36,94 @@ function loginUrl(provider: string) {
     new URLSearchParams({ return_to: location.pathname + location.search })
   );
 }
+
+function DemoTourMenu() {
+  const [open, setOpen] = useState(false);
+  const [scenarios, setScenarios] = useState<PaletteDemoScenario[]>([]);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    import("./demoMode").then((mod) => setScenarios(mod.getDemoScenarios()));
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node))
+        setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  if (!scenarios.length) return null;
+
+  return (
+    <div className="demo-tour" ref={ref}>
+      <button
+        type="button"
+        className="top-pill demo-pill"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+      >
+        <Sparkles size={14} />
+        <span className="top-pill-label">Interactive Demo</span>
+      </button>
+      {open && (
+        <div
+          className="theme-popover demo-popover panel"
+          role="dialog"
+          aria-label="Demo showcase tour"
+        >
+          <div className="theme-popover-head">
+            <Compass size={14} />
+            <span>Guided showcase scenarios</span>
+          </div>
+          <div className="theme-list">
+            {scenarios.map((sc) => (
+              <button
+                type="button"
+                key={sc.label}
+                className="theme-option"
+                onClick={() => {
+                  navigate(sc.href);
+                  setOpen(false);
+                }}
+              >
+                <span className="theme-option-copy">
+                  <strong>{sc.label}</strong>
+                  <small>{sc.detail}</small>
+                </span>
+                <ArrowRight size={14} />
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function App() {
+  useLocationHref();
+  const parsed = parseRoute();
+  const investigating = parsed.kind === "investigate";
+  const demo = isDemoMode();
   const [round, setRound] = useState(0);
+
   useEffect(() => {
     const expired = () => setRound((r) => r + 1);
     window.addEventListener("session-expired", expired);
     return () => window.removeEventListener("session-expired", expired);
   }, []);
+
   const load = useCallback(
     (signal: AbortSignal) => {
       void round;
@@ -35,7 +131,7 @@ function App() {
     },
     [round],
   );
-  const session = useRead(load);
+  const session = useRead(load, "session");
   const access = session.status === "ready" ? session.value.access : null;
   const provider =
     session.status === "ready" &&
@@ -44,31 +140,57 @@ function App() {
     session.value.providers.length === 1
       ? session.value.providers[0]
       : undefined;
+
   useEffect(() => {
     if (provider) location.replace(loginUrl(provider.id));
   }, [provider]);
+
   return (
     <>
       <header className="top">
         <div className="top-inner">
-          <a className="brand" href="/">
+          <a className="brand" href={appBasePath()} onClick={spaClick}>
             <img src={logo} alt="" />
-            {w.brand}
+            <span>{w.brand}</span>
           </a>
-          <span className="brand-product">{w.web}</span>
+          <span className="brand-badge">{w.web}</span>
           <span className="divider" />
           <span className="workspace">{w.workspace}</span>
-          {access && (
-            <form action="/auth/logout" method="post">
+
+          <div className="top-controls">
+            {demo && <DemoTourMenu />}
+            {access && <LivePulseToggle />}
+            {access && session.status === "ready" && (
+              <McpButton providers={session.value.providers} />
+            )}
+            {access && (
               <button
-                className="icon-button"
-                aria-label={w.signout}
-                title={w.signout}
+                type="button"
+                className="top-pill"
+                aria-label={w.commandPalette}
+                title="Quick jump (⌘K)"
+                onClick={() =>
+                  window.dispatchEvent(new Event("open-command-palette"))
+                }
               >
-                <LogOut size={18} />
+                <Search size={14} />
+                <span className="top-pill-label">Jump</span>
+                <kbd aria-hidden="true">⌘K</kbd>
               </button>
-            </form>
-          )}
+            )}
+            <ThemePicker />
+            {access && !demo && (
+              <form action="/auth/logout" method="post">
+                <button
+                  className="icon-button top-icon-btn"
+                  aria-label={w.signout}
+                  title={w.signout}
+                >
+                  <LogOut size={16} />
+                </button>
+              </form>
+            )}
+          </div>
         </div>
       </header>
       <main>
@@ -79,23 +201,25 @@ function App() {
         ) : provider ? (
           <StateMessage />
         ) : access ? (
-          <>
-            <ReadDefaults.Provider value={session.value.read_defaults}>
+          <ReadDefaults.Provider value={session.value.read_defaults}>
+            <ErrorBoundary resetKey={location.pathname + location.search}>
               <Workspace
                 access={access}
                 regions={session.value.regions ?? {}}
                 savedEnabled={session.value.saved_views_enabled}
               />
-            </ReadDefaults.Provider>
-          </>
+            </ErrorBoundary>
+          </ReadDefaults.Provider>
         ) : (
           <section className="signin panel">
-            <LockKeyhole size={24} />
+            <div className="signin-icon">
+              <LockKeyhole size={22} />
+            </div>
             <h1>{w.signIn}</h1>
             <p>{w.unauthorized}</p>
             {session.value.providers.map((p) => (
               <a key={p.id} className="signin-link" href={loginUrl(p.id)}>
-                {p.label}
+                <span>{p.label}</span>
                 <ArrowRight size={15} />
               </a>
             ))}
@@ -105,4 +229,5 @@ function App() {
     </>
   );
 }
+
 createRoot(document.getElementById("root")!).render(<App />);

@@ -433,7 +433,8 @@ test("regional fleets restrict discovery, isolate an unavailable archive and rou
     page.getByRole("heading", { name: "restricted blocking incident" }),
   ).toBeVisible();
   const euLink = page.url();
-  await page.getByLabel("Archive", { exact: true }).selectOption("production");
+  await page.getByRole("button", { name: "Archive", exact: true }).click();
+  await page.getByRole("option", { name: /production/ }).click();
   await page.getByRole("link", { name: "Orders", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "production blocking incident" }),
@@ -445,4 +446,72 @@ test("regional fleets restrict discovery, isolate an unavailable archive and rou
   await expect(
     page.getByRole("heading", { name: "restricted blocking incident" }),
   ).toBeVisible();
+});
+
+test("MCP endpoint publishes RFC 9728 OAuth metadata and enforces Entra/OIDC RBAC", async ({
+  page,
+}) => {
+  const metaRes = await page.request.get(
+    "/.well-known/oauth-protected-resource",
+  );
+  expect(metaRes.status()).toBe(200);
+  const meta = await metaRes.json();
+  expect(meta.resource).toContain("/mcp");
+  expect(meta.authorization_servers.length).toBeGreaterThan(0);
+
+  const unauthRes = await page.request.post("/mcp", {
+    data: { jsonrpc: "2.0", id: 1, method: "tools/list" },
+  });
+  expect(unauthRes.status()).toBe(401);
+  expect(unauthRes.headers()["www-authenticate"]).toContain(
+    "resource_metadata=",
+  );
+
+  const badBearer = await page.request.post("/mcp", {
+    headers: { Authorization: "Bearer invalid.jwt.token" },
+    data: { jsonrpc: "2.0", id: 2, method: "tools/list" },
+  });
+  expect(badBearer.status()).toBe(401);
+
+  await fixture(page);
+  await page.goto("/");
+  await signIn(page, "Viewer");
+
+  const origin = new URL(page.url()).origin;
+  const listArchives = await page.request.post("/mcp", {
+    headers: { Origin: origin },
+    data: {
+      jsonrpc: "2.0",
+      id: 3,
+      method: "tools/call",
+      params: { name: "list_archives", arguments: {} },
+    },
+  });
+  expect(listArchives.status()).toBe(200);
+  const listPayload = await listArchives.json();
+  const parsedArchives = JSON.parse(listPayload.result.content[0].text);
+  expect(parsedArchives[0].view_fleet).toBe(true);
+  expect(parsedArchives[0].inspect_evidence).toBe(false);
+
+  const deniedInspect = await page.request.post("/mcp", {
+    headers: { Origin: origin },
+    data: {
+      jsonrpc: "2.0",
+      id: 4,
+      method: "tools/call",
+      params: {
+        name: "investigate_incident",
+        arguments: {
+          archive: parsedArchives[0].archive,
+          namespace_id: resource.namespace_id,
+          database: resource.database,
+          around,
+        },
+      },
+    },
+  });
+  expect(deniedInspect.status()).toBe(200);
+  const deniedBody = await deniedInspect.json();
+  expect(deniedBody.result.isError).toBe(true);
+  expect(deniedBody.result.content[0].text).toContain("Access denied");
 });

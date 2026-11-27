@@ -1,6 +1,6 @@
 import { useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 import type { Timeline } from "../../vendor/culprit/app/src/gen/Timeline";
-import { rangeUrl, type ArchiveRange } from "./navigation";
+import { rangeUrl, spaClick, type ArchiveRange } from "./navigation";
 import { stamp } from "./shared";
 import w from "./en.json";
 
@@ -189,7 +189,7 @@ function BucketChart({ data, range }: { data: Bucket[]; range: ArchiveRange }) {
               width: percentage(b.until - b.from),
               height: b.unknown
                 ? "100%"
-                : Math.max(1, (100 * b.time) / peak) + "%",
+                : Math.max(2, (100 * b.time) / peak) + "%",
             }}
           />
         ))}
@@ -207,12 +207,13 @@ function BucketChart({ data, range }: { data: Bucket[]; range: ArchiveRange }) {
         </div>
         {selectedFrom < selectedUntil && (
           <a
-            className="button"
+            className="button button-accent"
             href={rangeUrl({
               from: new Date(selectedFrom).toISOString(),
               until: new Date(selectedUntil).toISOString(),
               recorded_before: range.recorded_before,
             })}
+            onClick={spaClick}
           >
             {w.inspectInterval}
           </a>

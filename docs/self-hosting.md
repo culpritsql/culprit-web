@@ -55,14 +55,17 @@ A signed-in DBA opens a shared investigation directly. With one provider, an exp
 
 ## Run the container
 
+Pull the published multi-arch image (`linux/amd64`, `linux/arm64`) from GitHub Container Registry, or build locally from source:
+
 ```sh
-docker build -t culprit-web:local .
 docker run --rm -p 127.0.0.1:8080:8080 \
   -v "$PWD/runtime/config:/run/config:ro" \
   -v culprit-web-state:/var/lib/culprit-web \
   -v "$PWD/runtime/secrets:/run/secrets:ro" \
-  culprit-web:local
+  ghcr.io/culpritsql/culprit-web:main
 ```
+
+To build a custom image locally instead, run `docker build -t culprit-web:local .`.
 
 Place `web.json`, its referenced archive config and the referenced OIDC secret at the mounted paths. Make them readable by UID 65532. For ClickHouse and S3, also pass the configured password environment variable and mount or supply the AWS profile and its credential source. `GET /healthz` reports process liveness. An authenticated fleet read exercises the storage path.
 
@@ -101,16 +104,33 @@ A saved view stores the title, archive revision, database selector, time, tab, e
 
 Grant `export_evidence` to enable the JSON download in the original-record inspector. The same database must also grant `inspect_evidence`. The download contains the selected archive response, including its page bounds and limitations. The session's existing SQL visibility still applies to the normal inspector.
 
-## Kubernetes
+## Kubernetes (OCI Helm Chart)
 
-Build and push the Docker image to your registry. Create a ConfigMap containing `web.json` and the archive files it references, a Secret containing your OIDC secret and a PVC for the workspace database.
+Install directly from the published OCI Helm chart in GitHub Container Registry. Create a ConfigMap containing `web.json` and the archive files it references, a Secret containing your OIDC secret, and a PVC for the workspace database:
 
 ```sh
-helm upgrade --install investigations ./charts/culprit-web \
-  --set image=REGISTRY/culprit-web:TAG \
+helm upgrade --install investigations oci://ghcr.io/culpritsql/charts/culprit-web \
+  --set imageTag=main \
   --set config.existingConfigMap=culprit-web-config \
   --set existingSecret=culprit-web-credentials \
   --set persistence.existingClaim=culprit-web-state
 ```
 
+On tagged `vX.Y.Z` releases, `imageTag` defaults automatically to `v<appVersion>`, or you can pin an immutable digest via `imageDigest=sha256:...` or override the entire image reference via `image=REGISTRY/culprit-web:TAG`.
+
 Alternatively, supply config objects under `config.files` in a Helm values file. Specify `env` entries with Secret key references for warehouse credentials. Supply a service account and pod labels when using cloud workload identity. For managed ingress, set the host and TLS secret to match `public_url`. Restart the deployment after changing an externally managed ConfigMap. Helm rolls out changes to inline config. An installation using the default temporary state volume loses saved links and audit history on pod replacement. [Chart values](../charts/culprit-web/values.yaml)
+
+## Connect Coding Agents (Model Context Protocol / MCP)
+
+Every `culprit-web` deployment exposes a read-only Streamable HTTP MCP server at `POST /mcp` alongside RFC 9728 OAuth 2.0 Protected Resource Metadata at `GET /.well-known/oauth-protected-resource`.
+
+- **Zero shared API keys**: Coding agents authenticate with a Microsoft Entra ID / OIDC `Authorization: Bearer <jwt>` verified against the configured provider's cached JWKS (`<client_id>` or `api://<client_id>` audience).
+- **Unified RBAC & audit trail**: Verified claims map through the exact same `Access::from_claims` archive and per-database grants as the browser UI, and every `tools/call` decision is recorded in `access_audit`.
+- **Available tools**: `list_archives`, `fleet_overview`, `investigate_incident`, `query_database_window`, and `diff_execution_plans`.
+
+```sh
+# Mint a short-lived Entra ID token from your signed-in Azure CLI session
+TOKEN="$(az account get-access-token --resource api://<ENTRA-CLIENT-ID> --query accessToken -o tsv)"
+claude mcp add --transport http culprit-fleet "https://YOUR-HOST/mcp" \
+  --header "Authorization: Bearer ${TOKEN}"
+```

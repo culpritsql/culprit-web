@@ -1,5 +1,10 @@
-# Full image reference from your build or registry, including its tag or digest.
+# Optional full image reference override (including tag or digest).
+# When blank, defaults to imageRepository + imageDigest or imageTag (v<Chart.AppVersion>).
 image: ""
+imageRepository: ghcr.io/culpritsql/culprit-web
+imageTag: ""
+imageDigest: ""
+imagePullPolicy: IfNotPresent
 imagePullSecrets: []
 # Either mount a ConfigMap containing web.json and archive settings or provide
 # their JSON objects here. Each key under config.files is a mounted file name.

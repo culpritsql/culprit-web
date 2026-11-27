@@ -15,13 +15,13 @@ use serde::Deserialize;
 use std::{collections::BTreeMap, sync::Arc};
 use tokio::sync::Semaphore;
 
-struct Archive {
-    info: WarehouseConnectionInfo,
-    reader: ArchiveWebApp,
+pub(crate) struct Archive {
+    pub(crate) info: WarehouseConnectionInfo,
+    pub(crate) reader: ArchiveWebApp,
 }
 pub struct ArchiveDirectory {
-    archives: BTreeMap<String, Archive>,
-    slots: Semaphore,
+    pub(crate) archives: BTreeMap<String, Archive>,
+    pub(crate) slots: Semaphore,
 }
 
 impl ArchiveDirectory {
@@ -44,8 +44,8 @@ impl ArchiveDirectory {
 
 #[derive(Clone)]
 pub struct WebState {
-    metadata: Option<crate::metadata::Metadata>,
-    directory: Arc<ArchiveDirectory>,
+    pub(crate) metadata: Option<crate::metadata::Metadata>,
+    pub(crate) directory: Arc<ArchiveDirectory>,
     pub auth: Arc<crate::auth::Auth>,
 }
 
@@ -80,8 +80,10 @@ pub fn routes(
 ) -> Router {
     Router::new()
         .merge(crate::bookmarks::routes())
+        .merge(crate::mcp::routes())
         .route("/api/archive/connections", get(connections))
         .route("/api/archive/{operation}", post(read))
+        .route("/api/plans/{operation}", post(plan_operation))
         .layer(DefaultBodyLimit::max(MAX_HTTP_BODY_BYTES))
         .with_state(WebState {
             directory: Arc::new(directory),
@@ -206,6 +208,55 @@ async fn read(
         .dispatch(
             "POST",
             &format!("/api/archive/{upstream}"),
+            &forwarded,
+            &body,
+            &owner.0,
+        )
+        .await;
+    Ok((
+        StatusCode::from_u16(result.status).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR),
+        [(header::CONTENT_TYPE, result.content_type)],
+        result.body,
+    )
+        .into_response())
+}
+
+async fn plan_operation(
+    State(state): State<WebState>,
+    Path(operation): Path<String>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Result<Response, Failure> {
+    let access = state.access(&headers)?;
+    if !matches!(
+        operation.as_str(),
+        "parse" | "diff" | "export-plan" | "export-diff"
+    ) {
+        return Err((StatusCode::NOT_FOUND, "Unknown plan route."));
+    }
+    if !access
+        .archives
+        .values()
+        .any(|grant| grant.has_inspection_grant())
+    {
+        return Err(DENIED);
+    }
+    let _slot = state
+        .directory
+        .slots
+        .try_acquire()
+        .map_err(|_| (StatusCode::SERVICE_UNAVAILABLE, "Archive is busy."))?;
+    let archive = state.directory.archives.values().next().ok_or(DENIED)?;
+    let owner = ReadGuard(CollectionCancellation::default());
+    let mut forwarded = BTreeMap::new();
+    if let Some(language) = headers.get("x-culprit-lang").and_then(|v| v.to_str().ok()) {
+        forwarded.insert("x-culprit-lang".into(), language.into());
+    }
+    let result = archive
+        .reader
+        .dispatch(
+            "POST",
+            &format!("/api/plans/{operation}"),
             &forwarded,
             &body,
             &owner.0,

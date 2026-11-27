@@ -3,6 +3,7 @@ mod archives;
 mod auth;
 mod bookmarks;
 mod config;
+mod mcp;
 mod metadata;
 mod session;
 
@@ -15,7 +16,7 @@ use axum::{
 };
 use std::{env, fs, sync::Arc};
 use tokio::net::TcpListener;
-use tower_http::services::ServeDir;
+use tower_http::services::{ServeDir, ServeFile};
 
 async fn private_response(req: axum::extract::Request, next: Next) -> Response {
     let mut res = next.run(req).await;
@@ -59,6 +60,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let api = archives::routes(directory, auth.clone(), metadata);
     let routes = Router::new()
         .route("/api/session", get(auth::session))
+        .route(
+            "/.well-known/oauth-protected-resource",
+            get(auth::oauth_protected_resource),
+        )
         .route("/auth/login/{id}", get(auth::login))
         .route("/auth/callback/{id}", get(auth::callback))
         .route("/auth/logout", post(auth::logout))
@@ -66,7 +71,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .merge(api)
         .layer(middleware::from_fn(private_response))
         .route("/healthz", get(|| async { "ok" }))
-        .fallback_service(ServeDir::new("dist"));
+        .fallback_service(
+            ServeDir::new("dist").not_found_service(ServeFile::new("dist/index.html")),
+        );
     let bind = env::var("CULPRIT_WEB_BIND").unwrap_or_else(|_| "127.0.0.1:8080".into());
     let listener = TcpListener::bind(&bind).await?;
     eprintln!("Culprit web listening on {}", listener.local_addr()?);

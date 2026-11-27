@@ -12,3 +12,14 @@ app.kubernetes.io/instance: {{ .Release.Name | quote }}
 {{- else -}}{{ fail "configure config.files with web.json or name an existingConfigMap" }}
 {{- end -}}
 {{- end -}}
+{{- define "culprit-web.image" -}}
+{{- if .Values.image -}}
+{{- .Values.image -}}
+{{- else if .Values.imageDigest -}}
+{{- printf "%s@%s" .Values.imageRepository .Values.imageDigest -}}
+{{- else if .Values.imageTag -}}
+{{- printf "%s:%s" .Values.imageRepository .Values.imageTag -}}
+{{- else -}}
+{{- printf "%s:v%s" .Values.imageRepository .Chart.AppVersion -}}
+{{- end -}}
+{{- end -}}
