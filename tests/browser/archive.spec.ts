@@ -286,3 +286,55 @@ test("a database assignment authorizes the exact namespace and never grants flee
   await page.getByRole("link", { name: "Orders" }).click();
   await expect(page.getByText("Blocked checkout")).toBeVisible();
 });
+
+test("saved investigations preserve their source scope and disappear after the inspection grant is removed", async ({
+  page,
+}) => {
+  await fixture(page);
+  await page.route("**/api/archive/incident", (route) =>
+    route.fulfill({ contentType: "application/json", body: incidentFixture }),
+  );
+  await page.goto("/");
+  await signIn(page, "DBA");
+  await page.getByRole("link", { name: "Orders" }).click();
+  await page.getByText("Saved investigations", { exact: true }).click();
+  await page.getByLabel("Investigation name").fill("Checkout review");
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  const saved = page.getByRole("link", { name: "Checkout review" });
+  await expect(saved).toBeVisible();
+  const bookmarks = await (
+    await page.request.get("/api/workspace/saved")
+  ).json();
+  const item = bookmarks.find(
+    (b: { title: string }) => b.title === "Checkout review",
+  );
+  expect(item.resource).toEqual(resource);
+  expect(
+    (
+      await page.request.post("/api/archive/export", {
+        data: { connection: item.connection, request: { resource } },
+      })
+    ).status(),
+  ).toBe(403);
+  expect(
+    (
+      await page.request.delete("/api/workspace/saved/" + item.id, {
+        headers: { Origin: "https://different.example" },
+      })
+    ).status(),
+  ).toBe(403);
+  await page.getByRole("button", { name: "Sign out" }).click();
+  await page.goto("/");
+  await signIn(page, "Viewer");
+  expect(await (await page.request.get("/api/workspace/saved")).json()).toEqual(
+    [],
+  );
+  await page.getByRole("button", { name: "Sign out" }).click();
+  await page.goto("/");
+  await signIn(page, "DBA");
+  await page.getByText("Saved investigations", { exact: true }).click();
+  await page.getByRole("button", { name: "Remove Checkout review" }).click();
+  await expect(
+    page.getByText("You have no saved investigations."),
+  ).toBeVisible();
+});

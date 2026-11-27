@@ -1,0 +1,27 @@
+# Full image reference from your build or registry, including its tag or digest.
+image: ""
+imagePullSecrets: []
+# Either mount a ConfigMap containing web.json and archive settings or provide
+# their JSON objects here. Each key under config.files is a mounted file name.
+config:
+  existingConfigMap: ""
+  files: {}
+# Mount named Secret keys as files under /run/secrets. Environment entries can
+# also refer to individual Secret keys required by your warehouse profile.
+existingSecret: ""
+env: []
+serviceAccountName: ""
+podLabels: {}
+podAnnotations: {}
+# Existing PVC for metadata_db. The mount is /var/lib/culprit-web.
+persistence:
+  existingClaim: ""
+resources: {}
+service:
+  port: 8080
+ingress:
+  enabled: false
+  className: ""
+  host: ""
+  tlsSecretName: ""
+  annotations: {}

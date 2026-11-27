@@ -8,6 +8,7 @@ import {
   type WarehouseConnectionRef,
   type PublishedResourceSelector,
 } from "./api";
+import { ExportEvidence } from "./ExportEvidence";
 import { CapturedPlan } from "./CapturedPlan";
 import { StateMessage, stamp } from "./shared";
 import w from "./en.json";
@@ -52,6 +53,7 @@ export function Evidence({
   return (
     <div className="records">
       <h3>{w.artifactScope}</h3>
+      <ExportEvidence connection={connection} query={report.query} />
       {!fullPayloads && (
         <button className="button" onClick={() => setFullPayloads(true)}>
           {w.readOriginal}

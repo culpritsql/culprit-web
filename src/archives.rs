@@ -43,26 +43,49 @@ impl ArchiveDirectory {
 }
 
 #[derive(Clone)]
-struct WebState {
+pub struct WebState {
+    metadata: Option<crate::metadata::Metadata>,
     directory: Arc<ArchiveDirectory>,
-    auth: Arc<crate::auth::Auth>,
+    pub auth: Arc<crate::auth::Auth>,
 }
 
 impl WebState {
-    fn access(&self, headers: &HeaderMap) -> Result<Access, Failure> {
+    pub fn metadata(&self) -> Result<&crate::metadata::Metadata, Failure> {
+        self.metadata.as_ref().ok_or((
+            StatusCode::SERVICE_UNAVAILABLE,
+            "Workspace storage is not configured.",
+        ))
+    }
+    pub fn allows_view(&self, access: &Access, view: &crate::metadata::SavedView) -> bool {
+        self.directory
+            .archives
+            .get(&view.connection.name)
+            .is_some_and(|a| a.info.reference.revision == view.connection.revision)
+            && access
+                .archives
+                .get(&view.connection.name)
+                .is_some_and(|g| g.may_inspect(&view.resource))
+    }
+    pub fn access(&self, headers: &HeaderMap) -> Result<Access, Failure> {
         self.auth
             .access(headers)
             .ok_or((StatusCode::UNAUTHORIZED, "Sign in to view this archive."))
     }
 }
 
-pub fn routes(directory: ArchiveDirectory, auth: Arc<crate::auth::Auth>) -> Router {
+pub fn routes(
+    directory: ArchiveDirectory,
+    auth: Arc<crate::auth::Auth>,
+    metadata: Option<crate::metadata::Metadata>,
+) -> Router {
     Router::new()
+        .merge(crate::bookmarks::routes())
         .route("/api/archive/connections", get(connections))
         .route("/api/archive/{operation}", post(read))
         .layer(DefaultBodyLimit::max(MAX_HTTP_BODY_BYTES))
         .with_state(WebState {
             directory: Arc::new(directory),
+            metadata,
             auth,
         })
 }
@@ -113,48 +136,66 @@ async fn read(
     body: Bytes,
 ) -> Result<Response, Failure> {
     let access = state.access(&headers)?;
-    let scoped = match operation.as_str() {
-        "fleet" => false,
-        "incident" | "artifacts" | "window" => true,
+    let (operation, upstream) = match operation.as_str() {
+        "fleet" => ("fleet", "fleet"),
+        "incident" => ("incident", "incident"),
+        "window" => ("window", "window"),
+        "artifacts" => ("artifacts", "artifacts"),
+        "export" => ("export", "artifacts"),
         _ => return Err((StatusCode::NOT_FOUND, "Unknown archive route.")),
     };
-    if scoped
-        && !access
-            .archives
-            .values()
-            .any(|grant| grant.has_inspection_grant())
-    {
-        return Err(DENIED);
-    }
-    let envelope: Connection = serde_json::from_slice(&body).map_err(|_| INVALID)?;
-    let grant = access
-        .archives
-        .get(&envelope.connection.name)
-        .ok_or(DENIED)?;
-    if scoped {
-        let selected = if operation == "incident" {
-            serde_json::from_slice::<Resource>(&body).map_err(|_| INVALID)?
-        } else {
-            serde_json::from_slice::<ResourceRequest>(&body)
-                .map_err(|_| INVALID)?
-                .request
-        };
-        if !grant.may_inspect(&selected.resource) {
-            return Err(DENIED);
-        }
-    } else if !grant.view_fleet {
-        return Err(DENIED);
-    }
-    let archive = state
-        .directory
-        .archives
-        .get(&envelope.connection.name)
-        .ok_or(DENIED)?;
     let _slot = state
         .directory
         .slots
         .try_acquire()
         .map_err(|_| (StatusCode::SERVICE_UNAVAILABLE, "Archive is busy."))?;
+    let envelope = serde_json::from_slice::<Connection>(&body);
+    let archive_name = envelope.as_ref().ok().map(|e| &e.connection.name);
+    let archive = archive_name.and_then(|name| state.directory.archives.get(name));
+    let grant = archive_name.and_then(|name| access.archives.get(name));
+    let selected = match operation {
+        "fleet" => None,
+        "incident" => serde_json::from_slice::<Resource>(&body)
+            .ok()
+            .map(|r| r.resource),
+        _ => serde_json::from_slice::<ResourceRequest>(&body)
+            .ok()
+            .map(|r| r.request.resource),
+    };
+    let allowed = match (grant, selected.as_ref()) {
+        (Some(grant), _) if operation == "fleet" => grant.view_fleet,
+        (Some(grant), Some(resource)) if operation == "export" => grant.may_export(resource),
+        (Some(grant), Some(resource)) => grant.may_inspect(resource),
+        _ => false,
+    };
+    if let Some(store) = &state.metadata {
+        store
+            .audit(
+                access.actor.clone(),
+                operation,
+                archive.map(|a| a.info.reference.name.clone()),
+                selected.as_ref().filter(|r| r.validate().is_ok()).cloned(),
+                if allowed { "allowed" } else { "denied" },
+            )
+            .await
+            .map_err(crate::bookmarks::storage_error)?;
+    }
+    if !allowed {
+        if envelope.is_err()
+            && operation != "fleet"
+            && !access
+                .archives
+                .values()
+                .any(|grant| grant.has_inspection_grant())
+        {
+            return Err(DENIED);
+        }
+        if envelope.is_err() || (grant.is_some() && operation != "fleet" && selected.is_none()) {
+            return Err(INVALID);
+        }
+        return Err(DENIED);
+    }
+    let archive = archive.ok_or(DENIED)?;
     let owner = ReadGuard(CollectionCancellation::default());
     let mut forwarded = BTreeMap::new();
     if let Some(language) = headers.get("x-culprit-lang").and_then(|v| v.to_str().ok()) {
@@ -164,7 +205,7 @@ async fn read(
         .reader
         .dispatch(
             "POST",
-            &format!("/api/archive/{operation}"),
+            &format!("/api/archive/{upstream}"),
             &forwarded,
             &body,
             &owner.0,

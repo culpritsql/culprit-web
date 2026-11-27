@@ -7,6 +7,7 @@ use url::Url;
 #[serde(deny_unknown_fields)]
 struct ConfigFile {
     public_url: Url,
+    metadata_db: Option<PathBuf>,
     archive_name: Option<String>,
     evidence_config: Option<PathBuf>,
     #[serde(default)]
@@ -24,6 +25,7 @@ pub struct ArchiveConfig {
 #[derive(Deserialize)]
 #[serde(try_from = "ConfigFile")]
 pub struct Config {
+    pub metadata_db: Option<PathBuf>,
     pub public_url: Url,
     pub archives: Vec<ArchiveConfig>,
     pub auth: AuthConfig,
@@ -43,6 +45,7 @@ impl TryFrom<ConfigFile> for Config {
             _ => return Err("use archives or a single archive_name and evidence_config pair"),
         };
         let config = Self {
+            metadata_db: file.metadata_db,
             public_url: file.public_url,
             archives,
             auth: file.auth,
@@ -87,6 +90,7 @@ pub struct Grant {
 pub enum Permission {
     ViewReports,
     InspectEvidence,
+    ExportEvidence,
 }
 
 fn secure_endpoint(url: &Url) -> bool {

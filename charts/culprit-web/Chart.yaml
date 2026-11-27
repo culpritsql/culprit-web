@@ -1,0 +1,7 @@
+apiVersion: v2
+name: culprit-web
+description: Self-hosted Culprit archive investigation workspace
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+home: https://github.com/culpritsql/culprit-web

@@ -1,15 +1,17 @@
 import { Database, ChevronRight } from "lucide-react";
 import {
   api,
+  ExportAccess,
   useRead,
   type Session,
   type ArchiveAccess,
   type PublishedResourceSelector,
 } from "./api";
+import { SavedViews } from "./SavedViews";
 import { Fleet } from "./Fleet";
 import { Incident } from "./Incident";
 import { StateMessage } from "./shared";
-import { archiveUrl, investigationUrl } from "./navigation";
+import { archiveUrl, investigationUrl, activeSection } from "./navigation";
 import w from "./en.json";
 
 export function mayInspect(
@@ -29,7 +31,9 @@ export function mayInspect(
 
 export function Workspace({
   access,
+  savedEnabled,
 }: {
+  savedEnabled: boolean;
   access: NonNullable<Session["access"]>;
 }) {
   const result = useRead(api.connections);
@@ -68,8 +72,16 @@ export function Workspace({
     return <StateMessage error={w.badLink} />;
   if (investigating && !mayInspect(grant, resource))
     return <StateMessage error={w.role} />;
+  const allowExport =
+    grant.export_evidence ||
+    grant.resources.some(
+      (r) =>
+        r.export_evidence &&
+        r.selector.namespace_id === resource.namespace_id &&
+        r.selector.database === resource.database,
+    );
   return (
-    <>
+    <ExportAccess.Provider value={investigating && allowExport}>
       <nav className="crumb" aria-label={w.workspace}>
         <Database size={15} />
         {connections.length > 1 ? (
@@ -92,6 +104,21 @@ export function Workspace({
             <ChevronRight size={13} />
             {w.progress}
           </>
+        )}
+        {savedEnabled && (
+          <SavedViews
+            selected={
+              investigating
+                ? {
+                    connection,
+                    resource,
+                    around,
+                    view: activeSection(params),
+                    incident: params.get("incident"),
+                  }
+                : null
+            }
+          />
         )}
       </nav>
       {investigating ? (
@@ -133,6 +160,6 @@ export function Workspace({
           </section>
         </>
       )}
-    </>
+    </ExportAccess.Provider>
   );
 }

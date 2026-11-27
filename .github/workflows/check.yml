@@ -13,6 +13,10 @@ jobs:
         with:
           bun-version: 1.4.2
       - run: rustup update stable && rustup default stable
+      - name: Render self-hosted chart
+        run: |
+          helm lint charts/culprit-web --set image=local/culprit-web:test --set config.existingConfigMap=workspace
+          helm template checks charts/culprit-web --set image=local/culprit-web:test --set config.existingConfigMap=workspace --set ingress.enabled=true --set ingress.host=test.example > /dev/null
       - run: cargo fmt --check
       - run: cargo test --locked
       - run: cargo clippy --locked --all-targets -- -D warnings

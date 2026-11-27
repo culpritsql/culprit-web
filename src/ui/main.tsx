@@ -81,7 +81,10 @@ function App() {
         ) : access ? (
           <>
             <ReadDefaults.Provider value={session.value.read_defaults}>
-              <Workspace access={access} />
+              <Workspace
+                access={access}
+                savedEnabled={session.value.saved_views_enabled}
+              />
             </ReadDefaults.Provider>
           </>
         ) : (

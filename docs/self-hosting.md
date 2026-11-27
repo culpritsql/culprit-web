@@ -39,6 +39,7 @@ A signed-in DBA opens a shared investigation directly. With one provider, an exp
 docker build -t culprit-web:local .
 docker run --rm -p 127.0.0.1:8080:8080 \
   -v "$PWD/runtime/config:/run/config:ro" \
+  -v culprit-web-state:/var/lib/culprit-web \
   -v "$PWD/runtime/secrets:/run/secrets:ro" \
   culprit-web:local
 ```
@@ -80,3 +81,25 @@ A resource-only user sees their assigned databases. Every incident, historical w
 ## Session lifetime
 
 Run one web replica. It can serve multiple archives. Sessions expire after 15 minutes or at the ID token expiration, whichever comes first. Restarting the process signs users out.
+
+## Saved investigations, access auditing and exports
+
+Set `metadata_db` to a file on a persistent volume writable by the web process. The example uses `/var/lib/culprit-web/workspace.sqlite3`. SQLite holds private saved links and an append-only application audit of signed-in archive read decisions. The `access_audit` table records the verified issuer and subject, UTC Unix time, operation, configured archive, validated resource identifiers and authorization decision. Restrict access to the volume and include it in your backup and retention policy.
+
+A saved view stores the title, archive revision, database selector, time, tab and optional incident revision. The server filters the saved list using the user's current permissions. Share the URL to let another DBA open it under their own identity.
+
+Grant `export_evidence` to enable the JSON download in the original-record inspector. The same database must also grant `inspect_evidence`. The download contains the selected archive response, including its page bounds and limitations. The session's existing SQL visibility still applies to the normal inspector.
+
+## Kubernetes
+
+Build and push the Docker image to your registry. Create a ConfigMap containing `web.json` and the archive files it references, a Secret containing your OIDC secret and a PVC for the workspace database.
+
+```sh
+helm upgrade --install investigations ./charts/culprit-web \
+  --set image=REGISTRY/culprit-web:TAG \
+  --set config.existingConfigMap=culprit-web-config \
+  --set existingSecret=culprit-web-credentials \
+  --set persistence.existingClaim=culprit-web-state
+```
+
+Alternatively, supply config objects under `config.files` in a Helm values file. Specify `env` entries with Secret key references for warehouse credentials. Supply a service account and pod labels when using cloud workload identity. For managed ingress, set the host and TLS secret to match `public_url`. Restart the deployment after changing an externally managed ConfigMap. Helm rolls out changes to inline config. An installation using the default temporary state volume loses saved links and audit history on pod replacement. [Chart values](../charts/culprit-web/values.yaml)

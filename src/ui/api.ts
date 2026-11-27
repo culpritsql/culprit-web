@@ -15,16 +15,31 @@ export type {
   WarehouseFleetRequest,
   PublishedResourceSelector,
 };
+import type { Section } from "./navigation";
+export interface SavedView {
+  title: string;
+  connection: WarehouseConnectionRef;
+  resource: PublishedResourceSelector;
+  around: string;
+  view: Section;
+  incident: string | null;
+}
+export type Bookmark = SavedView & { id: number };
+export const ExportAccess = createContext(false);
+
 export interface ArchiveAccess {
   view_fleet: boolean;
   inspect_evidence: boolean;
+  export_evidence: boolean;
   resources: {
     label: string;
     selector: PublishedResourceSelector;
     inspect_evidence: boolean;
+    export_evidence: boolean;
   }[];
 }
 export interface Session {
+  saved_views_enabled: boolean;
   read_defaults: { window_page_rows: number; artifact_chunk_chars: number };
   access: { archives: Record<string, ArchiveAccess> } | null;
   providers: { id: string; label: string }[];
@@ -41,11 +56,12 @@ export function useReadDefaults() {
 
 async function request<T>(
   path: string,
-  signal: AbortSignal,
+  signal: AbortSignal | undefined,
   body?: unknown,
+  method = body === undefined ? "GET" : "POST",
 ): Promise<T> {
   const response = await fetch(path, {
-    method: body === undefined ? "GET" : "POST",
+    method,
     signal,
     headers: body === undefined ? {} : { "Content-Type": "application/json" },
     body: body === undefined ? undefined : JSON.stringify(body),
@@ -62,10 +78,26 @@ async function request<T>(
     }
     throw new Error(message.slice(0, 400) || words.error);
   }
+  if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;
 }
 
 export const api = {
+  saved: (signal: AbortSignal) =>
+    request<Bookmark[]>("/api/workspace/saved", signal),
+  save: (view: SavedView) =>
+    request<void>("/api/workspace/saved", undefined, view),
+  remove: (id: number) =>
+    request<void>("/api/workspace/saved/" + id, undefined, undefined, "DELETE"),
+  exportOriginal: (
+    connection: WarehouseConnectionRef,
+    query: WarehouseArtifactQuery,
+    signal: AbortSignal,
+  ) =>
+    request<WarehouseArtifactReport>("/api/archive/export", signal, {
+      connection,
+      request: query,
+    }),
   session: (signal: AbortSignal) => request<Session>("/api/session", signal),
   connections: async (signal: AbortSignal) =>
     (

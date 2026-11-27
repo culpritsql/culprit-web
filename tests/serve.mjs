@@ -127,6 +127,7 @@ const secret = join(fixture, "secret");
 await writeFile(secret, "fixture-secret", { mode: 0o600 });
 const cfg = {
   public_url: base,
+  metadata_db: join(fixture, "workspace.sqlite3"),
   archives: ["production", "restricted"].map((name) => ({
     name,
     evidence_config:

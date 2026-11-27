@@ -1,7 +1,9 @@
 mod access;
 mod archives;
 mod auth;
+mod bookmarks;
 mod config;
+mod metadata;
 mod session;
 
 use axum::{
@@ -47,9 +49,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .nth(1)
         .ok_or("usage: culprit-web WEB_CONFIG.json")?;
     let config: config::Config = serde_json::from_slice(&fs::read(config_path)?)?;
+    let metadata = config
+        .metadata_db
+        .as_deref()
+        .map(metadata::Metadata::open)
+        .transpose()?;
     let directory = archives::ArchiveDirectory::open(&config.archives)?;
     let auth = Arc::new(auth::Auth::new(config)?);
-    let api = archives::routes(directory, auth.clone());
+    let api = archives::routes(directory, auth.clone(), metadata);
     let routes = Router::new()
         .route("/api/session", get(auth::session))
         .route("/auth/login/{id}", get(auth::login))

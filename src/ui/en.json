@@ -106,5 +106,13 @@
   "resourceViews": "Database views",
   "databaseTime": "Database time per native interval",
   "interval": "Interval",
-  "lowerBound": "Lower bound"
+  "lowerBound": "Lower bound",
+  "savedViews": "Saved investigations",
+  "saveView": "Save this view",
+  "saveTitle": "Investigation name",
+  "save": "Save",
+  "remove": "Remove",
+  "noSaved": "You have no saved investigations.",
+  "exportOriginal": "Export this evidence page",
+  "exportBusy": "Preparing export…"
 }

@@ -1,5 +1,5 @@
 use crate::{
-    access::Access,
+    access::{Access, Actor},
     config::{Config, Provider},
     session::Expiring,
 };
@@ -160,7 +160,7 @@ pub async fn session(State(auth): State<Arc<Auth>>, headers: HeaderMap) -> Json<
         .map(|p| json!({"id":p.id,"label":p.label}))
         .collect();
     Json(json!({
-        "access":auth.access(&headers), "providers":providers,
+        "saved_views_enabled":auth.config.metadata_db.is_some(),"access":auth.access(&headers), "providers":providers,
         "read_defaults": {
             "window_page_rows": culprit_core::DEFAULT_WAREHOUSE_WINDOW_PAGE_ROWS,
             "artifact_chunk_chars": culprit_core::MAX_WAREHOUSE_ARTIFACT_CHUNK_CHARS
@@ -249,6 +249,10 @@ pub async fn callback(
     let identity = token.claims(&verifier, &flow.nonce).map_err(|_| INVALID)?;
     let access = Access::from_claims(
         &id,
+        Actor {
+            issuer: identity.issuer().as_str().to_owned(),
+            subject: identity.subject().as_str().to_owned(),
+        },
         &identity.additional_claims().0,
         &auth.config.auth.grants,
     )

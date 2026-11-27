@@ -1,0 +1,10 @@
+{{- if .Values.config.files }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "culprit-web.fullname" . }}
+data:
+  {{- range $filename, $config := .Values.config.files }}
+  {{ $filename | quote }}: {{ $config | toJson | quote }}
+  {{- end }}
+{{- end }}

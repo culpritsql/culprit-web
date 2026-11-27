@@ -39,7 +39,7 @@ For credentials, role mappings, HTTPS and container deployment, follow the [self
 
 ## Investigations
 
-A shared link opens the database, time window and incident revision. Follow a waiting statement to its recorded blocker, inspect the original evidence, then use the suggested verification step to check the fix.
+Save a view for your next shift or share a link to the database, time window and incident revision. Follow a waiting statement to its recorded blocker, inspect the original evidence, then use the suggested verification step to check the fix.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/investigation-dark.png">
