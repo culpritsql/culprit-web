@@ -88,6 +88,21 @@ test("multi-theme switcher, clean routing, scroll stability, telemetry, schema/o
   await expect(
     page.getByRole("heading", { name: /Captured deadlock graphs/ }),
   ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: /SQL Server database & tempdb file capacity/ }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: /SQL Server memory clerks/ }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: /Active request memory grants/ }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: /TempDB, sort & hash workspace spills/ }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: /SQL Server Agent jobs/ }),
+  ).toBeVisible();
 
   // Verify Schema and indexes & Operations tabs have rich findings + SQL remediation
   await page.getByRole("link", { name: "Schema and indexes", exact: true }).click();
@@ -119,12 +134,16 @@ test("multi-theme switcher, clean routing, scroll stability, telemetry, schema/o
   await drawer.getByRole("button", { name: "Close statement inspector" }).click();
   await expect(drawer).toHaveCount(0);
 
-  // Verify MCP Coding Agent modal + live JSON-RPC tester
+  // Verify MCP Coding Agent modal portals outside sticky header + live JSON-RPC tester
   await page.getByRole("button", { name: "Connect coding agent via MCP" }).click();
+  const topHeaderBox = await page.locator("header.top").boundingBox();
+  expect(topHeaderBox?.height).toBeLessThanOrEqual(68);
   const mcpDialog = page.getByRole("dialog", {
     name: "Connect coding agent via MCP",
   });
   await expect(mcpDialog).toBeVisible();
+  const mcpBox = await mcpDialog.boundingBox();
+  expect(mcpBox?.width).toBeGreaterThanOrEqual(500);
   await mcpDialog.getByRole("button", { name: "Live Tester" }).click();
   await mcpDialog.getByRole("button", { name: "Run tools/list" }).click();
   await expect(mcpDialog.getByText(/"name": "investigate_incident"/)).toBeVisible();

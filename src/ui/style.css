@@ -4756,14 +4756,60 @@ summary::-webkit-details-marker {
 }
 
 /* MCP Coding Agent Modal */
+.mcp-backdrop {
+  z-index: 80;
+  padding: 6vh 16px 24px;
+}
+
 .mcp-modal {
   width: min(760px, 95vw);
-  max-height: 88vh;
+  max-height: 86vh;
   display: flex;
   flex-direction: column;
   background: var(--panel-elevated);
+  color: var(--ink);
   box-shadow: var(--shadow-lg);
   overflow: hidden;
+}
+
+.mcp-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.mcp-modal-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.mcp-title-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+
+.mcp-modal-title h2 {
+  margin: 0;
+  font-size: 16px;
+  letter-spacing: -0.02em;
+}
+
+.mcp-modal-title small {
+  display: block;
+  margin: 2px 0 0;
+  font-size: 12px;
 }
 
 .mcp-modal-body {
@@ -4893,10 +4939,120 @@ summary::-webkit-details-marker {
 
 @media (max-width: 920px) {
   .global-intel-grid,
-  .drawer-split-grid {
+  .drawer-split-grid,
+  .ops-dual-grid {
     grid-template-columns: 1fr;
   }
   .drawer-kpi-strip {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+}
+
+/* Operational Sub-Panels: Storage, Memory Clerks, Grants/Spills & Scheduled Jobs */
+.ops-kpi-band {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1px;
+  background: var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.ops-kpi-band > div {
+  background: var(--panel);
+  padding: 12px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ops-kpi-band small {
+  margin: 0;
+  font-size: 11.5px;
+}
+
+.ops-kpi-band strong {
+  font-size: 15.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.ops-inline-meter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--subtle);
+}
+
+.ops-inline-meter .track {
+  flex: 1;
+}
+
+.ops-cards-grid {
+  padding: 16px 20px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr));
+  gap: 12px;
+}
+
+.ops-cards-stack {
+  padding: 14px 18px 18px;
+  display: grid;
+  gap: 12px;
+}
+
+.ops-dual-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.ops-subcard {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 14px 16px;
+  background: color-mix(in srgb, var(--muted) 34%, var(--panel));
+  display: grid;
+  gap: 8px;
+}
+
+.ops-subcard-danger {
+  border-left: 3.5px solid var(--danger);
+}
+
+.ops-subcard-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.ops-subcard p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--subtle);
+  line-height: 1.5;
+}
+
+.ops-note-cell {
+  max-width: 38ch;
+  white-space: normal !important;
+  color: var(--subtle);
+  font-size: 12.5px;
+}
+
+.ops-Fold summary {
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.ops-fold-body {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 4px;
 }

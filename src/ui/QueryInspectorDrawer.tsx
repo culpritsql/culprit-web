@@ -1,4 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   Check,
   ChevronDown,
@@ -145,7 +146,7 @@ export function QueryInspectorDrawer({
       ? (100 * query.logical_reads) / totals.totalReads
       : null;
 
-  return (
+  return createPortal(
     <div
       className="drawer-backdrop"
       onMouseDown={(e) => {
@@ -428,6 +429,7 @@ export function QueryInspectorDrawer({
           )}
         </div>
       </aside>
-    </div>
+    </div>,
+    document.body,
   );
 }

@@ -6,10 +6,16 @@ import { warehouseWindowCase } from "../../vendor/culprit/app/src/test/warehouse
 import type { BlockingReport } from "../../vendor/culprit/app/src/gen/BlockingReport";
 import type { Changes } from "../../vendor/culprit/app/src/gen/Changes";
 import type { CollectedQueryWindowAnalysis } from "../../vendor/culprit/app/src/gen/CollectedQueryWindowAnalysis";
+import type { CompletedSpillEntry } from "../../vendor/culprit/app/src/gen/CompletedSpillEntry";
+import type { CompletedSpillReport } from "../../vendor/culprit/app/src/gen/CompletedSpillReport";
 import type { Deadlock } from "../../vendor/culprit/app/src/gen/Deadlock";
 import type { Engine } from "../../vendor/culprit/app/src/gen/Engine";
 import type { Finding } from "../../vendor/culprit/app/src/gen/Finding";
 import type { JobExecutionEvent } from "../../vendor/culprit/app/src/gen/JobExecutionEvent";
+import type { JobsReport } from "../../vendor/culprit/app/src/gen/JobsReport";
+import type { MemoryClerkReport } from "../../vendor/culprit/app/src/gen/MemoryClerkReport";
+import type { MemoryParticipantExplanation } from "../../vendor/culprit/app/src/gen/MemoryParticipantExplanation";
+import type { MemoryParticipantsReport } from "../../vendor/culprit/app/src/gen/MemoryParticipantsReport";
 import type { NodeResources } from "../../vendor/culprit/app/src/gen/NodeResources";
 import type { Plan } from "../../vendor/culprit/app/src/gen/Plan";
 import type { PlanChange } from "../../vendor/culprit/app/src/gen/PlanChange";
@@ -19,6 +25,7 @@ import type { PlanVariant } from "../../vendor/culprit/app/src/gen/PlanVariant";
 import type { QueryStat } from "../../vendor/culprit/app/src/gen/QueryStat";
 import type { ReplicationReport } from "../../vendor/culprit/app/src/gen/ReplicationReport";
 import type { Report } from "../../vendor/culprit/app/src/gen/Report";
+import type { StorageReport } from "../../vendor/culprit/app/src/gen/StorageReport";
 import type { WarehouseArtifactQuery } from "../../vendor/culprit/app/src/gen/WarehouseArtifactQuery";
 import type { WarehouseFleetReport } from "../../vendor/culprit/app/src/gen/WarehouseFleetReport";
 import type { WarehouseFleetRequest } from "../../vendor/culprit/app/src/gen/WarehouseFleetRequest";
@@ -1169,6 +1176,556 @@ function buildWindowTelemetry(
         ],
       }),
     ],
+    storage: [
+      {
+        original: capRef,
+        native_clock: { kind: "observation", from: untilIso, until: untilIso },
+        read_complete: true,
+        report: partial<StorageReport>({
+          title:
+            rowMeta.engine === "mssql"
+              ? "SQL Server database & tempdb file capacity"
+              : rowMeta.engine === "postgres"
+                ? "PostgreSQL tablespace & WAL directory usage"
+                : "InnoDB tablespace & temporary file capacity",
+          summary:
+            rowMeta.engine === "mssql"
+              ? "4 PRIMARY data files (82.5% full), 1 transaction log file, and shared tempdb version store observed."
+              : rowMeta.engine === "postgres"
+                ? "pg_default tablespace (79.1% used) and pg_wal segment retention observed."
+                : "InnoDB file-per-table data (92.7% used) and ibtmp1 temporary tablespace observed.",
+          limitations: [],
+          file_summary:
+            rowMeta.engine === "mssql"
+              ? {
+                  database: rowMeta.database_name,
+                  source: "sys.database_files",
+                  source_state: "collected",
+                  observed_at: untilIso,
+                  native_database_id: "7",
+                  data_file_count: 4,
+                  log_file_count: 1,
+                  other_file_count: 0,
+                  data_allocated_bytes: String(192 * 1024 ** 3),
+                  data_used_bytes: String(Math.round(158.4 * 1024 ** 3)),
+                  log_catalog_allocated_bytes: String(32 * 1024 ** 3),
+                  title: "Selected database file census",
+                  summary: "4 rowstore data files · 1 transaction log file",
+                  fields: [
+                    {
+                      key: "log_reuse_wait",
+                      label: "Log reuse wait",
+                      value:
+                        dbId === resource.database
+                          ? "ACTIVE_TRANSACTION"
+                          : "LOG_BACKUP",
+                    },
+                    {
+                      key: "autogrow",
+                      label: "Autogrowth",
+                      value: "+512 MiB (unlimited)",
+                    },
+                  ],
+                  limitations: [],
+                }
+              : {
+                  database: rowMeta.database_name,
+                  source:
+                    rowMeta.engine === "postgres"
+                      ? "pg_database_size"
+                      : "information_schema.files",
+                  source_state: "collected",
+                  observed_at: untilIso,
+                  native_database_id: null,
+                  data_file_count: rowMeta.engine === "postgres" ? 1 : 6,
+                  log_file_count: 1,
+                  other_file_count: 0,
+                  data_allocated_bytes: String(
+                    (isAnalytics ? 420 : 312) * 1024 ** 3,
+                  ),
+                  data_used_bytes: String(
+                    Math.round((isAnalytics ? 389.2 : 246.8) * 1024 ** 3),
+                  ),
+                  log_catalog_allocated_bytes: String(
+                    Math.round((isOrders ? 14.2 : 8.4) * 1024 ** 3),
+                  ),
+                  title: "Database storage summary",
+                  summary: "Complete storage catalog snapshot",
+                  fields: [
+                    {
+                      key: "wal_or_redo",
+                      label:
+                        rowMeta.engine === "postgres"
+                          ? "Retained WAL"
+                          : "Redo / Undo space",
+                      value: isOrders ? "14.2 GiB (slot lag)" : "8.4 GiB",
+                    },
+                  ],
+                  limitations: [],
+                },
+          entries:
+            rowMeta.engine === "mssql"
+              ? [
+                  {
+                    source: "sys.database_files",
+                    observation_key: "primary-fg",
+                    scope: "database",
+                    title: "PRIMARY filegroup (checkout_data01..04.mdf)",
+                    explanation:
+                      "Balanced 4-file layout across NVMe volumes; 33.6 GiB free headroom before next 512 MiB autogrow.",
+                    fields: [
+                      { key: "used", label: "Used", value: "158.4 GiB" },
+                      { key: "allocated", label: "Allocated", value: "192.0 GiB" },
+                      { key: "growth", label: "Autogrow", value: "512 MiB" },
+                    ],
+                  },
+                  {
+                    source: "sys.dm_db_file_space_usage",
+                    observation_key: "tempdb-vs",
+                    scope: "server",
+                    title: "Shared tempdb space & version store",
+                    explanation:
+                      dbId === resource.database
+                        ? "Open transaction in Session 84 pinned 4.8 GiB in the row version store for 42.8 seconds."
+                        : "Tempdb user, internal, and version-store allocations are within normal bounds.",
+                    fields: [
+                      {
+                        key: "version_store",
+                        label: "Version store",
+                        value: dbId === resource.database ? "4.8 GiB" : "310 MiB",
+                      },
+                      {
+                        key: "internal_objects",
+                        label: "Internal sort/hash",
+                        value: "1.9 GiB",
+                      },
+                      { key: "total", label: "Tempdb total", value: "64.0 GiB" },
+                    ],
+                  },
+                ]
+              : [
+                  {
+                    source:
+                      rowMeta.engine === "postgres"
+                        ? "pg_tablespace"
+                        : "information_schema.files",
+                    observation_key: "main-ts",
+                    scope: "database",
+                    title:
+                      rowMeta.engine === "postgres"
+                        ? "pg_default tablespace & TOAST relations"
+                        : "innodb_file_per_table (.ibd) & ibtmp1",
+                    explanation: isOrders
+                      ? "WAL segment retention grew to 14.2 GiB while standby replay lagged 18.4 s behind primary."
+                      : isAnalytics
+                        ? "Analytics event partitions occupy 92.7% of provisioned GP3 volume capacity."
+                        : "Tablespace and write-ahead log retention are healthy.",
+                    fields: [
+                      {
+                        key: "used",
+                        label: "Used",
+                        value: isAnalytics ? "389.2 GiB" : "246.8 GiB",
+                      },
+                      {
+                        key: "allocated",
+                        label: "Provisioned",
+                        value: isAnalytics ? "420.0 GiB" : "312.0 GiB",
+                      },
+                      {
+                        key: "temp",
+                        label: "Temp / WAL",
+                        value: isOrders ? "14.2 GiB WAL" : "12.6 GiB temp",
+                      },
+                    ],
+                  },
+                ],
+        }),
+      },
+    ],
+    memory_clerks: [
+      {
+        original: capRef,
+        native_clock: { kind: "observation", from: untilIso, until: untilIso },
+        read_complete: true,
+        report: partial<MemoryClerkReport>({
+          title:
+            rowMeta.engine === "mssql"
+              ? "SQL Server memory clerks (sys.dm_os_memory_clerks)"
+              : rowMeta.engine === "postgres"
+                ? "PostgreSQL shared & backend memory contexts"
+                : "MySQL Performance Schema memory instruments",
+          summary:
+            "Top memory consumers captured from engine allocator counters",
+          limitations: [],
+          observed_rows: 4,
+          presented_rows: 4,
+          entries_limited: false,
+          entries:
+            rowMeta.engine === "mssql"
+              ? [
+                  {
+                    observation_key: "bp",
+                    scope: "server",
+                    clerk_type: "MEMORYCLERK_SQLBUFFERPOOL",
+                    name: "Buffer Pool (data & index pages)",
+                    memory_node_id: "0",
+                    explanation:
+                      "Primary rowstore page cache across NUMA node 0.",
+                    fields: [
+                      {
+                        key: "pages_kb",
+                        label: "Allocated (KiB)",
+                        value: "40265318",
+                        unit: { kind: "kibibytes" },
+                      },
+                    ],
+                  },
+                  {
+                    observation_key: "cp",
+                    scope: "server",
+                    clerk_type: "CACHESTORE_SQLCP",
+                    name: "Ad-hoc & prepared SQL plan cache",
+                    memory_node_id: "0",
+                    explanation:
+                      "Single-use unparameterized query plans consuming 4.2 GiB of plan cache.",
+                    fields: [
+                      {
+                        key: "pages_kb",
+                        label: "Allocated (KiB)",
+                        value: "4404019",
+                        unit: { kind: "kibibytes" },
+                      },
+                    ],
+                  },
+                  {
+                    observation_key: "qe",
+                    scope: "server",
+                    clerk_type: "MEMORYCLERK_SQLQUERYEXEC",
+                    name: "Query execution sort & hash workspace",
+                    memory_node_id: "0",
+                    explanation:
+                      "Active sort/hash workspace reservations across concurrent requests.",
+                    fields: [
+                      {
+                        key: "pages_kb",
+                        label: "Allocated (KiB)",
+                        value: "3250585",
+                        unit: { kind: "kibibytes" },
+                      },
+                    ],
+                  },
+                  {
+                    observation_key: "lk",
+                    scope: "server",
+                    clerk_type: "OBJECTSTORE_LOCK_MANAGER",
+                    name: "Lock manager blocks & owners",
+                    memory_node_id: "0",
+                    explanation:
+                      dbId === resource.database
+                        ? "Elevated lock block count held during Session 84 checkout lock chain."
+                        : "Baseline key and page lock structures.",
+                    fields: [
+                      {
+                        key: "pages_kb",
+                        label: "Allocated (KiB)",
+                        value: dbId === resource.database ? "1468006" : "393216",
+                        unit: { kind: "kibibytes" },
+                      },
+                    ],
+                  },
+                ]
+              : [
+                  {
+                    observation_key: "shared-buf",
+                    scope: "server",
+                    clerk_type:
+                      rowMeta.engine === "postgres"
+                        ? "shared_buffers"
+                        : "memory/innodb/buf_buf_pool",
+                    name: "Primary page buffer pool",
+                    memory_node_id: "0",
+                    explanation: "Resident table and index blocks in RAM.",
+                    fields: [
+                      {
+                        key: "pages_kb",
+                        label: "Allocated (KiB)",
+                        value: isAnalytics ? "46137344" : "33554432",
+                        unit: { kind: "kibibytes" },
+                      },
+                    ],
+                  },
+                  {
+                    observation_key: "work-mem",
+                    scope: "server",
+                    clerk_type:
+                      rowMeta.engine === "postgres"
+                        ? "ExecutorState / HashBatchContext"
+                        : "memory/sql/JOIN_CACHE",
+                    name: "Sort, hash & join execution buffers",
+                    memory_node_id: "0",
+                    explanation:
+                      "Backend execution memory across active analytical and OLTP queries.",
+                    fields: [
+                      {
+                        key: "pages_kb",
+                        label: "Allocated (KiB)",
+                        value: isAnalytics ? "6291456" : "2516582",
+                        unit: { kind: "kibibytes" },
+                      },
+                    ],
+                  },
+                  {
+                    observation_key: "wal-mem",
+                    scope: "server",
+                    clerk_type:
+                      rowMeta.engine === "postgres"
+                        ? "WalSender / ReplicationSlot"
+                        : "memory/temptable/physical_ram",
+                    name:
+                      rowMeta.engine === "postgres"
+                        ? "WAL senders & replication buffers"
+                        : "In-memory TempTable engine",
+                    memory_node_id: "0",
+                    explanation: "Streaming replication and temporary table allocations.",
+                    fields: [
+                      {
+                        key: "pages_kb",
+                        label: "Allocated (KiB)",
+                        value: "2097152",
+                        unit: { kind: "kibibytes" },
+                      },
+                    ],
+                  },
+                ],
+        }),
+      },
+    ],
+    memory_grants: [
+      {
+        original: capRef,
+        native_clock: { kind: "observation", from: untilIso, until: untilIso },
+        read_complete: true,
+        kind: "request-grants",
+        report: partial<MemoryParticipantsReport>({
+          title: "Active request memory grants & semaphore admission",
+          summary:
+            rowMeta.active_incidents > 0 || isAnalytics
+              ? "2 large workspace grants (2.8 GiB) active; 1 request queued on RESOURCE_SEMAPHORE"
+              : "1 active workspace memory grant (184 MiB) · zero grant waiters",
+          limitations: [],
+          admission_resources: [],
+          entries:
+            rowMeta.active_incidents > 0 || isAnalytics
+              ? [
+                  partial<MemoryParticipantExplanation>({
+                    observation_key: "grant-holder-77",
+                    mechanism: "reservation-during-client-output-wait",
+                    title:
+                      "Session 77 · Holding 1.92 GiB sort/hash grant while streaming result rows",
+                    explanation:
+                      "Over-estimated row goal reserved 1.92 GiB in Resource Pool 'default' (used 412 MiB) while client paused on ASYNC_NETWORK_IO.",
+                    investigation:
+                      "Inspect cardinality estimate skew on ORDER BY / GROUP BY input and ensure client consumes result sets without row-by-row pauses.",
+                    verify:
+                      "Confirm granted_memory_kb aligns within 2× of max_used_memory_kb after updating statistics.",
+                  }),
+                  partial<MemoryParticipantExplanation>({
+                    observation_key: "grant-waiter-91",
+                    title:
+                      "Session 91 · Waiting 1,840 ms for 648 MiB workspace grant (RESOURCE_SEMAPHORE)",
+                    explanation:
+                      "Queued behind active large-gateway holders on semaphore 0 in pool 'default'.",
+                    investigation:
+                      "Add supporting index order to eliminate explicit Sort operator or cap MAX_GRANT_PERCENT.",
+                    verify:
+                      "Verify RESOURCE_SEMAPHORE wait_ms drops to 0 in Wait class breakdown.",
+                  }),
+                ]
+              : [
+                  partial<MemoryParticipantExplanation>({
+                    observation_key: "grant-steady-52",
+                    title:
+                      "Session 52 · Granted 184 MiB (used 162 MiB) · Running",
+                    explanation:
+                      "Workspace memory grant matches actual hash build size with zero semaphore contention.",
+                    investigation: "No action required — grant efficiency is 88%.",
+                    verify: "Continue monitoring workspace semaphore headroom.",
+                  }),
+                ],
+        }),
+      },
+    ],
+    spills: [
+      {
+        original: capRef,
+        native_clock: { kind: "observation", from: untilIso, until: untilIso },
+        read_complete: true,
+        report: partial<CompletedSpillReport>({
+          title: "TempDB, sort & hash workspace spills",
+          summary:
+            rowMeta.active_incidents > 0 || isAnalytics
+              ? "1 statement spilled 143.9 MiB (18,420 pages) to temporary storage in this window"
+              : "Zero sort or hash spills recorded across cached statements",
+          limitations: [],
+          read_complete: true,
+          native_rows: 1,
+          observed_rows: 1,
+          entries:
+            rowMeta.active_incidents > 0 || isAnalytics
+              ? [
+                  partial<CompletedSpillEntry>({
+                    state: "recorded-spills",
+                    title:
+                      rowMeta.engine === "mssql"
+                        ? "Level-2 Sort & Hash spill to tempdb (18,420 pages)"
+                        : rowMeta.engine === "postgres"
+                          ? "External merge disk sort spilled 384 MiB across 12 temp files"
+                          : "TempTable overflowed RAM budget to disk (64 on-disk temp tables)",
+                    statement_preview:
+                      rowMeta.engine === "mssql"
+                        ? "SELECT c.id, c.email, o.total_cents FROM shop.customers c JOIN shop.orders o ON o.customer_id = c.id WHERE c.region = @r ORDER BY o.created_at DESC"
+                        : rowMeta.engine === "postgres"
+                          ? "SELECT oi.sku, SUM(oi.qty * oi.unit_price) FROM public.order_items oi GROUP BY oi.sku ORDER BY 2 DESC"
+                          : "SELECT tenant_id, DATE(occurred_at) AS d, COUNT(*) FROM analytics.events GROUP BY tenant_id, DATE(occurred_at)",
+                    statement_preview_truncated: false,
+                    statement_unavailable: null,
+                    explanation:
+                      "Under-estimated input rows caused the execution grant to overflow RAM into temporary disk blocks, inflating I/O latency.",
+                    metrics: [
+                      {
+                        label: "Spilled volume",
+                        value: 143.9,
+                        unit: "count",
+                        text:
+                          rowMeta.engine === "postgres"
+                            ? "384.0 MiB"
+                            : "143.9 MiB (18,420 pages)",
+                      },
+                      {
+                        label: "Affected executions",
+                        value: 142,
+                        unit: "count",
+                        text: "142 runs",
+                      },
+                    ],
+                    investigation:
+                      "Update multi-column statistics or add an index matching the GROUP BY / ORDER BY key.",
+                    verify:
+                      "Confirm temp_bytes / spilled_pages remain 0 across subsequent intervals.",
+                  }),
+                ]
+              : [],
+        }),
+      },
+    ],
+    jobs: [
+      {
+        original: capRef,
+        native_clock: { kind: "observation", from: untilIso, until: untilIso },
+        read_complete: true,
+        report: partial<JobsReport>({
+          title:
+            rowMeta.engine === "mssql"
+              ? "SQL Server Agent jobs & step outcomes"
+              : rowMeta.engine === "postgres"
+                ? "Scheduled background jobs (pg_cron / Timescale)"
+                : "MySQL Event Scheduler runs",
+          summary: isLedger || isOrders
+            ? "3 scheduled jobs observed · 1 failed run in window"
+            : "2 scheduled maintenance & backup jobs succeeded on schedule",
+          limitations: [],
+          read_complete: true,
+          native_rows: 2,
+          observed_rows: 2,
+          entries_limited: false,
+          entries: [
+            {
+              source:
+                rowMeta.engine === "mssql"
+                  ? "msdb.dbo.sysjobs"
+                  : rowMeta.engine === "postgres"
+                    ? "cron.job"
+                    : "information_schema.events",
+              observation_key: "job-backup",
+              job_id: "job-01",
+              kind: "retained-run",
+              title:
+                rowMeta.engine === "mssql"
+                  ? "TransactionLog_Backup_5m"
+                  : rowMeta.engine === "postgres"
+                    ? "rollup_hourly_order_metrics"
+                    : "evt_session_rollup_5m",
+              explanation:
+                "Completed on schedule within SLA; zero retry steps triggered.",
+              metrics: [
+                {
+                  label: "Last outcome",
+                  value: 1,
+                  unit: "count",
+                  text: "Succeeded",
+                },
+                {
+                  label: "Duration",
+                  value: 4200,
+                  unit: "ms",
+                  text: "4.2 s",
+                },
+              ],
+              investigation: "Healthy recurring schedule.",
+              verify: "Continue monitoring schedule intervals.",
+            },
+            {
+              source:
+                rowMeta.engine === "mssql"
+                  ? "msdb.dbo.sysjobhistory"
+                  : rowMeta.engine === "postgres"
+                    ? "cron.job_run_details"
+                    : "information_schema.events",
+              observation_key: "job-maint",
+              job_id: "job-02",
+              kind: "retained-step",
+              title:
+                isLedger
+                  ? "Settlement_Reconcile_15m"
+                  : isOrders
+                    ? "purge_expired_carts_15m"
+                    : "Index_And_Stats_Maintenance",
+              explanation:
+                isLedger
+                  ? "Step 2 failed with error 1205 (deadlock victim on dbo.ledger_entries) and queued retry."
+                  : isOrders
+                    ? "Aborted after 5,000 ms lock_timeout waiting on public.orders batch update."
+                    : "Online statistics refresh completed across 14 modified tables.",
+              metrics: [
+                {
+                  label: "Last outcome",
+                  value: isLedger || isOrders ? 0 : 1,
+                  unit: "count",
+                  text: isLedger || isOrders ? "Failed" : "Succeeded",
+                },
+                {
+                  label: "Duration",
+                  value: isLedger || isOrders ? 5012 : 38400,
+                  unit: "ms",
+                  text: isLedger || isOrders ? "5.0 s" : "38.4 s",
+                },
+              ],
+              investigation:
+                isLedger || isOrders
+                  ? "Resolve underlying lock/deadlock contention on target table and verify job retry policy."
+                  : "No action needed.",
+              verify:
+                "Verify next scheduled run completes with status Succeeded.",
+            },
+          ],
+          executions: {
+            assessment: "evaluated" as never,
+            entries: [],
+            events: [],
+          },
+        }),
+      },
+    ],
   };
 }
 
@@ -1179,6 +1736,7 @@ function makeOriginals(fromIso: string, untilIso: string): WindowOriginal[] {
     ["activity-observations", "observation", "81197ccd5a3e"],
     ["query-runtime", "interval", "c9204e8b71d4"],
     ["query-waits", "interval", "d382a10f9c6b"],
+    ["operational-samples", "observation", "f284c90e61d3"],
     ["database-settings", "observation", "1924dec05136"],
     ["schema-catalog", "observation", "e7510bc492a8"],
   ];

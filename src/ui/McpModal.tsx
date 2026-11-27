@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   Bot,
   Check,
@@ -171,9 +172,9 @@ export CULPRIT_MCP_TOKEN="$(az account get-access-token \\
     }
   };
 
-  return (
+  return createPortal(
     <div
-      className="modal-backdrop"
+      className="palette-backdrop mcp-backdrop"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -184,9 +185,11 @@ export CULPRIT_MCP_TOKEN="$(az account get-access-token \\
         aria-modal="true"
         aria-label="Connect coding agent via MCP"
       >
-        <header className="plan-diff-head">
-          <div className="plan-diff-title">
-            <Bot size={18} />
+        <header className="mcp-modal-head">
+          <div className="mcp-modal-title">
+            <span className="mcp-title-icon">
+              <Bot size={18} />
+            </span>
             <div>
               <h2>Model Context Protocol (MCP) Server</h2>
               <small>
@@ -340,6 +343,7 @@ export CULPRIT_MCP_TOKEN="$(az account get-access-token \\
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

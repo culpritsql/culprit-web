@@ -1,9 +1,13 @@
 import { lazy, Suspense, useMemo, useState } from "react";
 import {
   Activity,
+  CalendarClock,
   Cpu,
+  Database,
+  Flame,
   GitBranch,
   HardDrive,
+  Layers,
   Lock,
   Network,
   Server,
@@ -149,6 +153,11 @@ export function ResourcesView({ data }: { data: WarehouseWindowReport }) {
   const deadlocks = telemetry?.deadlocks ?? [];
   const replication = telemetry?.replication ?? [];
   const nodeResources = telemetry?.node_resources ?? [];
+  const storagePoints = telemetry?.storage ?? [];
+  const memoryClerkPoints = telemetry?.memory_clerks ?? [];
+  const memoryGrantPoints = telemetry?.memory_grants ?? [];
+  const spillPoints = telemetry?.spills ?? [];
+  const jobPoints = telemetry?.jobs ?? [];
 
   if (
     !telemetry ||
@@ -157,7 +166,12 @@ export function ResourcesView({ data }: { data: WarehouseWindowReport }) {
       !activityPoints.length &&
       !deadlocks.length &&
       !replication.length &&
-      !nodeResources.length)
+      !nodeResources.length &&
+      !storagePoints.length &&
+      !memoryClerkPoints.length &&
+      !memoryGrantPoints.length &&
+      !spillPoints.length &&
+      !jobPoints.length)
   ) {
     return (
       <section className="panel notice">
@@ -534,6 +548,370 @@ export function ResourcesView({ data }: { data: WarehouseWindowReport }) {
           </div>
         </section>
       )}
+
+      {storagePoints.length > 0 && (() => {
+        const latestStorage = storagePoints[storagePoints.length - 1]!.report;
+        const fs = latestStorage.file_summary;
+        const allocBytes = fs?.data_allocated_bytes
+          ? Number(fs.data_allocated_bytes)
+          : null;
+        const usedBytes = fs?.data_used_bytes
+          ? Number(fs.data_used_bytes)
+          : null;
+        const logBytes = fs?.log_catalog_allocated_bytes
+          ? Number(fs.log_catalog_allocated_bytes)
+          : null;
+        const usedPct =
+          allocBytes && usedBytes && allocBytes > 0
+            ? Math.min(100, (100 * usedBytes) / allocBytes)
+            : null;
+        const fmtGib = (b: number | null) =>
+          b !== null && Number.isFinite(b)
+            ? `${(b / 1024 ** 3).toFixed(1)} GiB`
+            : "—";
+
+        return (
+          <section className="panel">
+            <header className="panel-head">
+              <div className="panel-head-copy">
+                <h2 className="icon-heading">
+                  <HardDrive size={18} />
+                  {latestStorage.title || "Storage & file space capacity"}
+                </h2>
+                <small>{latestStorage.summary}</small>
+              </div>
+              {fs && (
+                <span className="case-meta-pill">
+                  {fs.data_file_count ?? 0} data · {fs.log_file_count ?? 0} log
+                  files
+                </span>
+              )}
+            </header>
+
+            {fs && (
+              <div className="ops-kpi-band">
+                <div>
+                  <small>Data used / allocated</small>
+                  <strong>
+                    {fmtGib(usedBytes)} / {fmtGib(allocBytes)}
+                  </strong>
+                  {usedPct !== null && (
+                    <div className="ops-inline-meter">
+                      <div className="track">
+                        <i
+                          className={usedPct >= 88 ? "seg-lock" : "seg-cpu"}
+                          style={{ width: `${usedPct}%` }}
+                        />
+                      </div>
+                      <span>{pct(usedPct)}</span>
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <small>Log / WAL allocated</small>
+                  <strong>{fmtGib(logBytes)}</strong>
+                </div>
+                {fs.fields.map((f) => (
+                  <div key={f.key}>
+                    <small>{f.label}</small>
+                    <strong>{f.value ?? "—"}</strong>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {latestStorage.entries.length > 0 && (
+              <div className="ops-cards-grid">
+                {latestStorage.entries.map((entry) => (
+                  <div key={entry.observation_key} className="ops-subcard">
+                    <div className="ops-subcard-top">
+                      <strong>{entry.title}</strong>
+                      <span className="category-pill">{entry.scope}</span>
+                    </div>
+                    <p>{entry.explanation}</p>
+                    {entry.fields.length > 0 && (
+                      <div className="diag-metrics-row">
+                        {entry.fields.map((f) => (
+                          <span key={f.key} className="diag-metric-chip">
+                            <small>{f.label}</small>
+                            <b>{f.value ?? "—"}</b>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        );
+      })()}
+
+      {memoryClerkPoints.length > 0 && (() => {
+        const latestClerks =
+          memoryClerkPoints[memoryClerkPoints.length - 1]!.report;
+        const parsedClerks = latestClerks.entries.map((entry) => {
+          const primaryField = entry.fields[0];
+          const rawNum = primaryField?.value ? Number(primaryField.value) : 0;
+          const bytes =
+            primaryField?.unit.kind === "kibibytes"
+              ? rawNum * 1024
+              : primaryField?.unit.kind === "bytes"
+                ? rawNum
+                : 0;
+          const display =
+            bytes >= 1024 ** 3
+              ? `${(bytes / 1024 ** 3).toFixed(2)} GiB`
+              : bytes >= 1024 ** 2
+                ? `${(bytes / 1024 ** 2).toFixed(1)} MiB`
+                : primaryField?.value ?? "—";
+          return { entry, bytes, display };
+        });
+        const totalClerkBytes = parsedClerks.reduce((s, c) => s + c.bytes, 0);
+        const tones = ["seg-cpu", "seg-memory", "seg-io", "seg-lock", "seg-network"];
+
+        return (
+          <section className="panel">
+            <header className="panel-head">
+              <div className="panel-head-copy">
+                <h2 className="icon-heading">
+                  <Layers size={18} />
+                  {latestClerks.title || "Engine memory clerks"}
+                </h2>
+                <small>{latestClerks.summary}</small>
+              </div>
+              {totalClerkBytes > 0 && (
+                <strong>
+                  {(totalClerkBytes / 1024 ** 3).toFixed(1)} GiB tracked
+                </strong>
+              )}
+            </header>
+
+            {totalClerkBytes > 0 && (
+              <div className="wait-proportion-bar" aria-hidden="true">
+                {parsedClerks.map((c, idx) => (
+                  <i
+                    key={c.entry.observation_key}
+                    className={tones[idx % tones.length]}
+                    style={{ flex: Math.max(1, c.bytes) }}
+                    title={`${c.entry.clerk_type}: ${c.display}`}
+                  />
+                ))}
+              </div>
+            )}
+
+            <div className="table-scroll">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Clerk / Allocator</th>
+                    <th>Subsystem</th>
+                    <th>Scope</th>
+                    <th>Allocation</th>
+                    <th>Share</th>
+                    <th>Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {parsedClerks.map(({ entry, bytes, display }) => (
+                    <tr key={entry.observation_key}>
+                      <td>
+                        <code>{entry.clerk_type}</code>
+                      </td>
+                      <td>
+                        <strong>{entry.name || entry.clerk_type}</strong>
+                      </td>
+                      <td>
+                        <span className="category-pill">{entry.scope}</span>
+                      </td>
+                      <td>
+                        <strong>{display}</strong>
+                      </td>
+                      <td>
+                        {totalClerkBytes > 0
+                          ? pct((100 * bytes) / totalClerkBytes)
+                          : "—"}
+                      </td>
+                      <td className="ops-note-cell">{entry.explanation}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        );
+      })()}
+
+      {(memoryGrantPoints.length > 0 || spillPoints.length > 0) && (
+        <section className="ops-dual-grid">
+          {memoryGrantPoints.length > 0 && (() => {
+            const latestGrant =
+              memoryGrantPoints[memoryGrantPoints.length - 1]!;
+            return (
+              <div className="panel">
+                <header className="panel-head">
+                  <div className="panel-head-copy">
+                    <h2 className="icon-heading">
+                      <Database size={18} />
+                      {latestGrant.report.title ||
+                        "Active request memory grants"}
+                    </h2>
+                    <small>{latestGrant.report.summary}</small>
+                  </div>
+                  <span className="category-pill">{latestGrant.kind}</span>
+                </header>
+                <div className="ops-cards-stack">
+                  {latestGrant.report.entries.map((entry) => (
+                    <div key={entry.observation_key} className="ops-subcard">
+                      <div className="ops-subcard-top">
+                        <strong>{entry.title}</strong>
+                        {entry.mechanism && (
+                          <span className="wait-pill wait-memory">
+                            {entry.mechanism}
+                          </span>
+                        )}
+                      </div>
+                      <p>{entry.explanation}</p>
+                      <details className="ops-Fold">
+                        <summary>Investigation &amp; verification</summary>
+                        <div className="ops-fold-body">
+                          <p>
+                            <b>Investigate:</b> {entry.investigation}
+                          </p>
+                          <p>
+                            <b>Verify:</b> {entry.verify}
+                          </p>
+                        </div>
+                      </details>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+
+          {spillPoints.length > 0 && (() => {
+            const latestSpill = spillPoints[spillPoints.length - 1]!.report;
+            return (
+              <div className="panel">
+                <header className="panel-head">
+                  <div className="panel-head-copy">
+                    <h2 className="icon-heading">
+                      <Flame size={18} />
+                      {latestSpill.title || "TempDB, sort & hash spills"}
+                    </h2>
+                    <small>{latestSpill.summary}</small>
+                  </div>
+                  <span
+                    className={
+                      latestSpill.entries.length > 0
+                        ? "status stale"
+                        : "status observed"
+                    }
+                  >
+                    <i />
+                    {latestSpill.entries.length > 0
+                      ? `${latestSpill.entries.length} spilling`
+                      : "0 spills"}
+                  </span>
+                </header>
+                {latestSpill.entries.length > 0 ? (
+                  <div className="ops-cards-stack">
+                    {latestSpill.entries.map((entry, idx) => (
+                      <div key={idx} className="ops-subcard">
+                        <div className="ops-subcard-top">
+                          <strong>{entry.title}</strong>
+                          <span className="severity-pill sev-warn">
+                            {entry.state}
+                          </span>
+                        </div>
+                        <p>{entry.explanation}</p>
+                        {entry.metrics.length > 0 && (
+                          <div className="diag-metrics-row">
+                            {entry.metrics.map((m, mIdx) => (
+                              <span key={mIdx} className="diag-metric-chip">
+                                <small>{m.label}</small>
+                                <b>{m.text ?? String(m.value)}</b>
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        {entry.statement_preview && (
+                          <div className="diag-sql-wrap">
+                            <Suspense
+                              fallback={<code>{entry.statement_preview}</code>}
+                            >
+                              <LazySql text={entry.statement_preview} />
+                            </Suspense>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="notice">
+                    No sort, hash, or tempdb workspace spills recorded in this
+                    window.
+                  </p>
+                )}
+              </div>
+            );
+          })()}
+        </section>
+      )}
+
+      {jobPoints.length > 0 && (() => {
+        const latestJobs = jobPoints[jobPoints.length - 1]!.report;
+        return (
+          <section className="panel">
+            <header className="panel-head">
+              <div className="panel-head-copy">
+                <h2 className="icon-heading">
+                  <CalendarClock size={18} />
+                  {latestJobs.title || "Scheduled & background jobs"}
+                </h2>
+                <small>{latestJobs.summary}</small>
+              </div>
+            </header>
+            <div className="ops-cards-grid">
+              {latestJobs.entries.map((job) => {
+                const failed = job.metrics.some(
+                  (m) => m.text?.toLowerCase() === "failed",
+                );
+                return (
+                  <div
+                    key={job.observation_key}
+                    className={`ops-subcard ${failed ? "ops-subcard-danger" : ""}`}
+                  >
+                    <div className="ops-subcard-top">
+                      <strong>{job.title}</strong>
+                      <span
+                        className={
+                          failed ? "status danger" : "status observed"
+                        }
+                      >
+                        <i />
+                        {failed ? "Failed" : "Succeeded"}
+                      </span>
+                    </div>
+                    <p>{job.explanation}</p>
+                    {job.metrics.length > 0 && (
+                      <div className="diag-metrics-row">
+                        {job.metrics.map((m, mIdx) => (
+                          <span key={mIdx} className="diag-metric-chip">
+                            <small>{m.label}</small>
+                            <b>{m.text ?? String(m.value)}</b>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        );
+      })()}
     </div>
   );
 }
