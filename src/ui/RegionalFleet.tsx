@@ -19,7 +19,13 @@ import {
 } from "lucide-react";
 import type { WarehouseFleetReport } from "../../vendor/culprit/app/src/gen/WarehouseFleetReport";
 import type { WarehouseFleetRow } from "../../vendor/culprit/app/src/gen/WarehouseFleetRow";
-import { api, isDemoMode, useRead, type WarehouseConnectionRef } from "./api";
+import {
+  api,
+  fleetNowIso,
+  isSampleEstate,
+  useRead,
+  type WarehouseConnectionRef,
+} from "./api";
 import { EngineBadge } from "./EngineBadge";
 import { fleetRequest } from "./fleetRequest";
 import { useLiveTick } from "./livePulse";
@@ -243,9 +249,12 @@ export function RegionalFleet({
   const [reports, setReports] = useState<Record<string, WarehouseFleetReport>>(
     {},
   );
-  const [asOf, setAsOf] = useState(() =>
-    isDemoMode() ? "2026-10-11T12:14:00.000Z" : new Date().toISOString(),
-  );
+  const isShowcaseEstate = isSampleEstate(connections);
+  const [asOf, setAsOf] = useState(() => fleetNowIso(connections));
+
+  useEffect(() => {
+    if (isShowcaseEstate) setAsOf(fleetNowIso(connections));
+  }, [isShowcaseEstate, connections]);
 
   const handleReport = useCallback(
     (name: string, report: WarehouseFleetReport) => {
@@ -291,9 +300,6 @@ export function RegionalFleet({
       unreachable,
     };
   }, [loadedList]);
-
-  const isShowcaseEstate =
-    isDemoMode() || connections.some((c) => c.name === "Demo estate");
 
   const trend = useMemo(
     () =>
@@ -528,13 +534,7 @@ export function RegionalFleet({
           <button
             type="button"
             className="button"
-            onClick={() =>
-              setAsOf(
-                isDemoMode()
-                  ? "2026-10-11T12:14:00.000Z"
-                  : new Date().toISOString(),
-              )
-            }
+            onClick={() => setAsOf(fleetNowIso(connections))}
           >
             <RefreshCw size={15} />
             {w.refresh}

@@ -20,12 +20,35 @@ export type {
 };
 import type { Section, ArchiveRange } from "./navigation";
 
+export const DEMO_NOW_ISO = "2026-10-11T12:14:00.000Z";
+
 export function isDemoMode(): boolean {
   if (import.meta.env.VITE_DEMO_MODE === "true") return true;
   if (typeof window !== "undefined") {
     return new URLSearchParams(window.location.search).get("demo") === "1";
   }
   return false;
+}
+
+export function isSampleEstate(
+  connections: WarehouseConnectionRef | readonly WarehouseConnectionRef[],
+): boolean {
+  if (isDemoMode()) return true;
+  const list: readonly WarehouseConnectionRef[] = Array.isArray(connections)
+    ? connections
+    : [connections as WarehouseConnectionRef];
+  return list.some(
+    (c) =>
+      c.name === "Demo estate" ||
+      (c.name === "eu-production" && c.revision === "e".repeat(64)) ||
+      (c.name === "jp-production" && c.revision === "f".repeat(64)),
+  );
+}
+
+export function fleetNowIso(
+  connections: WarehouseConnectionRef | readonly WarehouseConnectionRef[],
+): string {
+  return isSampleEstate(connections) ? DEMO_NOW_ISO : new Date().toISOString();
 }
 
 export type ArchiveScope = {

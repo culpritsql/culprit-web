@@ -19,10 +19,12 @@ test("multi-theme switcher, clean routing, scroll stability, telemetry, schema/o
       name: "What needs attention across the estate",
     }),
   ).toBeVisible();
-  // Verify blind / unreachable collector targets are promoted directly into global triage
+  // Verify blind / unreachable collector targets are promoted directly into global triage with sample-estate relative clock
   await expect(
     page.getByText("collector unreachable · blind target"),
   ).toBeVisible();
+  await expect(page.getByText(/failed 1m 47s ago/)).toBeVisible();
+  await expect(page.getByText(/4\dd ago/)).toHaveCount(0);
 
   // Verify global UTC / Local timezone toggle updates timestamps reactively
   const tzBtn = page.getByRole("button", { name: "Toggle display timezone" });

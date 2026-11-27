@@ -18,7 +18,13 @@ import {
 import type { WarehouseFleetCursor } from "../../vendor/culprit/app/src/gen/WarehouseFleetCursor";
 import type { WarehouseFleetRow } from "../../vendor/culprit/app/src/gen/WarehouseFleetRow";
 import type { Engine } from "../../vendor/culprit/app/src/gen/Engine";
-import { api, isDemoMode, useRead, type WarehouseConnectionRef } from "./api";
+import {
+  api,
+  fleetNowIso,
+  isSampleEstate,
+  useRead,
+  type WarehouseConnectionRef,
+} from "./api";
 import { EngineBadge } from "./EngineBadge";
 import { fleetRequest } from "./fleetRequest";
 import { FleetCharts } from "./FleetCharts";
@@ -49,9 +55,8 @@ export function Fleet({
   onRowsLoaded?: (rows: WarehouseFleetRow[]) => void;
 }) {
   const liveTick = useLiveTick();
-  const [asOf, setAsOf] = useState(() =>
-    isDemoMode() ? "2026-10-11T12:14:00.000Z" : new Date().toISOString(),
-  );
+  const sampleEstate = isSampleEstate(connection);
+  const [asOf, setAsOf] = useState(() => fleetNowIso(connection));
   const [attention, setAttention] = useState(false);
   const [search, setSearch] = useState("");
   const [envFilter, setEnvFilter] = useState<string | null>(null);
@@ -70,7 +75,8 @@ export function Fleet({
     setEnvFilter(null);
     setEngineFilter(null);
     setSearch("");
-  }, [connection.name]);
+    setAsOf(fleetNowIso(connection));
+  }, [connection]);
 
   useEffect(() => {
     const onSlash = (e: KeyboardEvent) => {
@@ -92,7 +98,7 @@ export function Fleet({
   const load = useCallback(
     (signal: AbortSignal) => {
       const effectiveCutoff =
-        liveTick > 0 && !isDemoMode() ? new Date().toISOString() : asOf;
+        liveTick > 0 && !sampleEstate ? new Date().toISOString() : asOf;
       void liveTick;
       return api.fleet(
         connection,
@@ -102,7 +108,7 @@ export function Fleet({
         signal,
       );
     },
-    [connection, asOf, attention, after, backendSort, liveTick],
+    [connection, asOf, attention, after, backendSort, liveTick, sampleEstate],
   );
 
   // Stale-while-revalidate keyed by connection.name prevents DOM collapse & scroll jump!
@@ -243,10 +249,7 @@ export function Fleet({
   ];
 
   const collectorTargets = report?.collector_targets ?? [];
-  const effectiveAsOf =
-    report?.rows[0]?.latest_collected_until && isDemoMode()
-      ? "2026-10-11T12:14:00.000Z"
-      : asOf;
+  const effectiveAsOf = sampleEstate ? fleetNowIso(connection) : asOf;
 
   return (
     <>
@@ -261,11 +264,7 @@ export function Fleet({
             className="button"
             onClick={() => {
               setCursors([null]);
-              setAsOf(
-                isDemoMode()
-                  ? "2026-10-11T12:14:00.000Z"
-                  : new Date().toISOString(),
-              );
+              setAsOf(fleetNowIso(connection));
             }}
           >
             <RefreshCw
