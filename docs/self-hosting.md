@@ -1,0 +1,82 @@
+# Self-host Culprit Web
+
+## Run from source
+
+Use stable Rust, Bun and Node.js for the browser tests. Run these commands from the web repo.
+
+```sh
+git submodule update --init --recursive
+bun install --frozen-lockfile
+bun run build
+cargo build --locked
+./target/debug/culprit-web /absolute/path/to/web.json
+```
+
+Run the binary from the directory containing `dist/`. It listens on `127.0.0.1:8080` by default. Set `CULPRIT_WEB_BIND` to change that address. Terminate HTTPS at a reverse proxy and set `public_url` to the external HTTPS origin. Local development also accepts an HTTP loopback origin.
+
+## Connect published archives
+
+1. Copy the web example, choose an archive name and set `evidence_config` to the mounted archive configuration file. Use the same archive name in every grant. [Web configuration](../config/web.example.json)
+2. Copy the configuration for the installed warehouse and recovery service. Match the collector's pipeline, shard, database and recovery namespace. Supply credentials with read access to the published warehouse data and recovery objects. [ClickHouse and S3](../config/archive.example.json) · [ADX and Azure Blob](../config/archive.azure.example.json)
+3. For the ClickHouse example, supply `CULPRIT_WAREHOUSE_PASSWORD` to the server and make the configured AWS profile available to its OS user. The container includes the AWS CLI. The Azure example uses a managed identity. Workload identity can also be configured using the upstream credential profile. [Archive reader configuration](https://github.com/culpritsql/culprit-sql-studio/blob/main/docs/collector.md)
+
+## Configure company sign-in
+
+1. For Microsoft Entra ID, register a single-tenant **Web** application. Set the redirect URI to `https://YOUR-HOST/auth/callback/corporate`. Set the tenant-specific issuer with the tenant GUID, application client ID and a mounted client secret file in the web configuration.
+2. Define the application roles `Culprit.Viewer` and `Culprit.DBA` and assign users or groups to them. The example maps these values from the verified ID token's `roles` claim. MFA follows the tenant's sign-in policy.
+3. For another OIDC provider, configure its discovery issuer, client ID, secret file, user-facing label and unique provider ID. Register `/auth/callback/PROVIDER-ID` at that provider using the full public origin. Configure a custom role or group claim in the ID token, list any required additional scopes under `scopes` and map exact claim values to permissions. Multiple providers may coexist. Each grant belongs to one provider and one archive.
+
+| Permission | What a user can open |
+|---|---|
+| `view_reports` | Fleet summary and resource list |
+| `inspect_evidence` | Fleet, incident details, captured query text in those details, published findings and changes, and original evidence throughout this archive |
+
+A signed-in DBA opens a shared investigation directly. With one provider, an expired or missing local session sends a shared-link visitor to company sign-in and returns them to the investigation. With several providers, they choose one. A user without a matching grant receives an access-denied response. Warehouse access always uses the server's separate credentials.
+
+## Run the container
+
+```sh
+docker build -t culprit-web:local .
+docker run --rm -p 127.0.0.1:8080:8080 \
+  -v "$PWD/runtime/config:/run/config:ro" \
+  -v "$PWD/runtime/secrets:/run/secrets:ro" \
+  culprit-web:local
+```
+
+Place `web.json`, its referenced archive config and the referenced OIDC secret at the mounted paths. Make them readable by UID 65532. For ClickHouse and S3, also pass the configured password environment variable and mount or supply the AWS profile and its credential source. `GET /healthz` reports process liveness. An authenticated fleet read exercises the storage path.
+
+## Assign individual databases
+
+Use `archives` to configure several independently credentialed archives in the same process. Existing single-archive files with `archive_name` and `evidence_config` still load. An archive must appear in a matching grant before a user can discover it.
+
+```json
+"archives": [
+  { "name": "production", "evidence_config": "/run/config/production.json" },
+  { "name": "analytics", "evidence_config": "/run/config/analytics.json" }
+]
+```
+
+Add `resources` to a grant to limit it to named databases. Copy both complete selector values from the published fleet row. A database name can recur across namespaces. The label here is for navigation.
+
+```json
+{
+  "provider": "corporate",
+  "archive": "production",
+  "claim": "roles",
+  "value": "Culprit.CheckoutTeam",
+  "permissions": ["inspect_evidence"],
+  "resources": [{
+    "label": "Checkout",
+    "selector": {
+      "namespace_id": "<64 hexadecimal characters from the fleet row>",
+      "database": "<64 hexadecimal characters from the fleet row>"
+    }
+  }]
+}
+```
+
+A resource-only user sees their assigned databases. Every incident, historical window and original is authorized on the server. Archive-wide viewers can open the fleet. Add an inspection grant for the databases whose SQL and plans they should see.
+
+## Session lifetime
+
+Run one web replica. It can serve multiple archives. Sessions expire after 15 minutes or at the ID token expiration, whichever comes first. Restarting the process signs users out.

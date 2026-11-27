@@ -8,9 +8,13 @@ import {
   type WarehouseConnectionRef,
   type PublishedResourceSelector,
 } from "./api";
+import { CapturedPlan } from "./CapturedPlan";
 import { StateMessage, stamp } from "./shared";
 import w from "./en.json";
-type Archive = { connection: WarehouseConnectionRef; resource: PublishedResourceSelector };
+type Archive = {
+  connection: WarehouseConnectionRef;
+  resource: PublishedResourceSelector;
+};
 export function Evidence({
   connection,
   resource,
@@ -39,7 +43,11 @@ export function Evidence({
   );
   const result = useRead(load);
   if (result.status !== "ready")
-    return <StateMessage error={result.status === "error" ? result.message : undefined} />;
+    return (
+      <StateMessage
+        error={result.status === "error" ? result.message : undefined}
+      />
+    );
   const report = result.value;
   return (
     <div className="records">
@@ -52,7 +60,9 @@ export function Evidence({
       {textRead.kind === "chunk" && (
         <button
           className="button"
-          onClick={() => setTextRead({ kind: "inventory", chunk_chars: chunkChars })}
+          onClick={() =>
+            setTextRead({ kind: "inventory", chunk_chars: chunkChars })
+          }
         >
           {w.backInventory}
         </button>
@@ -67,6 +77,7 @@ export function Evidence({
           {row.artifacts.map((item, index) => (
             <div key={index}>
               <h4>{item.label}</h4>
+              {item.plan && <CapturedPlan plan={item.plan} />}
               {item.payload.kind === "complete" && (
                 <pre>
                   {item.payload.payload.state === "available"
@@ -97,9 +108,11 @@ export function Evidence({
           </details>
         </div>
       ))}
-      {[...report.gaps.map((g) => g.kind), ...report.qualifications].map((text, i) => (
-        <p key={i}>{text}</p>
-      ))}
+      {[...report.gaps.map((g) => g.kind), ...report.qualifications].map(
+        (text, i) => (
+          <p key={i}>{text}</p>
+        ),
+      )}
     </div>
   );
 }

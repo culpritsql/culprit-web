@@ -8,8 +8,15 @@ import { join } from "node:path";
 import { once } from "node:events";
 
 const base = "http://127.0.0.1:4387";
-const { privateKey, publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
-const jwk = { ...publicKey.export({ format: "jwk" }), kid: "test-key", use: "sig", alg: "RS256" };
+const { privateKey, publicKey } = generateKeyPairSync("rsa", {
+  modulusLength: 2048,
+});
+const jwk = {
+  ...publicKey.export({ format: "jwk" }),
+  kid: "test-key",
+  use: "sig",
+  alg: "RS256",
+};
 const codes = new Map();
 const fixture = await mkdtemp(join(tmpdir(), "culprit-web-test-"));
 let issuer;
@@ -46,7 +53,7 @@ const provider = http.createServer(async (req, res) => {
       return res.end(
         '<form action="/tenant/select"><input type="hidden" name="flow" value="' +
           flow +
-          '"><button name="role" value="DBA">DBA</button><button name="role" value="Viewer">Viewer</button><button name="role" value="Guest">Guest</button></form>',
+          '"><button name="role" value="DBA">DBA</button><button name="role" value="Viewer">Viewer</button><button name="role" value="Orders team">Orders team</button><button name="role" value="Guest">Guest</button></form>',
       );
     }
     case "/tenant/select": {
@@ -73,7 +80,8 @@ const provider = http.createServer(async (req, res) => {
       codes.delete(code);
       if (
         !info ||
-        req.headers.authorization !== "Basic " + Buffer.from("culprit:fixture-secret").toString("base64") ||
+        req.headers.authorization !==
+          "Basic " + Buffer.from("culprit:fixture-secret").toString("base64") ||
         createHash("sha256")
           .update(data.get("code_verifier") || "")
           .digest("base64url") !== info.code_challenge
@@ -82,7 +90,8 @@ const provider = http.createServer(async (req, res) => {
         return res.end();
       }
       const now = Math.floor(Date.now() / 1000);
-      const encode = (value) => Buffer.from(JSON.stringify(value)).toString("base64url");
+      const encode = (value) =>
+        Buffer.from(JSON.stringify(value)).toString("base64url");
       const signed =
         encode({ alg: "RS256", kid: "test-key" }) +
         "." +
@@ -98,7 +107,12 @@ const provider = http.createServer(async (req, res) => {
       return send({
         access_token: "unused-fixture-token",
         token_type: "Bearer",
-        id_token: signed + "." + sign("RSA-SHA256", Buffer.from(signed), privateKey).toString("base64url"),
+        id_token:
+          signed +
+          "." +
+          sign("RSA-SHA256", Buffer.from(signed), privateKey).toString(
+            "base64url",
+          ),
       });
     }
     default:
@@ -113,13 +127,38 @@ const secret = join(fixture, "secret");
 await writeFile(secret, "fixture-secret", { mode: 0o600 });
 const cfg = {
   public_url: base,
-  archive_name: "production",
-  evidence_config: process.env.CULPRIT_FIXTURE_ARCHIVE || "config/archive.example.json",
+  archives: ["production", "restricted"].map((name) => ({
+    name,
+    evidence_config:
+      process.env.CULPRIT_FIXTURE_ARCHIVE || "config/archive.example.json",
+  })),
   auth: {
     providers: [
-      { id: "company", label: "Company SSO", issuer, client_id: "culprit", client_secret_file: secret },
+      {
+        id: "company",
+        label: "Company SSO",
+        issuer,
+        client_id: "culprit",
+        client_secret_file: secret,
+      },
     ],
     grants: [
+      {
+        provider: "company",
+        archive: "production",
+        claim: "roles",
+        value: "Orders team",
+        permissions: ["inspect_evidence"],
+        resources: [
+          {
+            label: "Orders",
+            selector: {
+              namespace_id: "a".repeat(64),
+              database: "b".repeat(64),
+            },
+          },
+        ],
+      },
       {
         provider: "company",
         archive: "production",
@@ -139,10 +178,18 @@ const cfg = {
 };
 const path = join(fixture, "web.json");
 await writeFile(path, JSON.stringify(cfg));
-const server = spawn(process.env.CULPRIT_WEB_BINARY || "target/debug/culprit-web", [path], {
-  stdio: "inherit",
-  env: { ...process.env, CULPRIT_WAREHOUSE_PASSWORD: "test-only", CULPRIT_WEB_BIND: "127.0.0.1:4387" },
-});
+const server = spawn(
+  process.env.CULPRIT_WEB_BINARY || "target/debug/culprit-web",
+  [path],
+  {
+    stdio: "inherit",
+    env: {
+      ...process.env,
+      CULPRIT_WAREHOUSE_PASSWORD: "test-only",
+      CULPRIT_WEB_BIND: "127.0.0.1:4387",
+    },
+  },
+);
 let stopping = false;
 const stop = () => {
   if (stopping) return;

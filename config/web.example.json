@@ -1,7 +1,11 @@
 {
   "public_url": "https://culprit.example.com",
-  "archive_name": "production",
-  "evidence_config": "/run/config/archive.json",
+  "archives": [
+    {
+      "name": "production",
+      "evidence_config": "/run/config/archive.json"
+    }
+  ],
   "auth": {
     "providers": [
       {
@@ -18,14 +22,19 @@
         "archive": "production",
         "claim": "roles",
         "value": "Culprit.Viewer",
-        "permissions": ["view_reports"]
+        "permissions": [
+          "view_reports"
+        ]
       },
       {
         "provider": "corporate",
         "archive": "production",
         "claim": "roles",
         "value": "Culprit.DBA",
-        "permissions": ["view_reports", "inspect_evidence"]
+        "permissions": [
+          "view_reports",
+          "inspect_evidence"
+        ]
       }
     ]
   }

@@ -11,6 +11,9 @@ import {
 } from "lucide-react";
 import type { WarehouseFleetCursor } from "../../vendor/culprit/app/src/gen/WarehouseFleetCursor";
 import { api, useRead, type WarehouseConnectionRef } from "./api";
+import { FleetCharts } from "./FleetCharts";
+import { investigationUrl } from "./navigation";
+import type { PublishedResourceSelector } from "./api";
 import { StateMessage, stamp } from "./shared";
 import engines from "../../vendor/culprit/app/src/gen/engines.json";
 import w from "./en.json";
@@ -20,11 +23,13 @@ export function Fleet({
   canInspect,
 }: {
   connection: WarehouseConnectionRef;
-  canInspect: boolean;
+  canInspect: (resource: PublishedResourceSelector) => boolean;
 }) {
   const [asOf, setAsOf] = useState(() => new Date().toISOString());
   const [attention, setAttention] = useState(false);
-  const [cursors, setCursors] = useState<(WarehouseFleetCursor | null)[]>([null]);
+  const [cursors, setCursors] = useState<(WarehouseFleetCursor | null)[]>([
+    null,
+  ]);
   const after = cursors[cursors.length - 1];
   const load = useCallback(
     (signal: AbortSignal) =>
@@ -34,7 +39,12 @@ export function Fleet({
           as_of: asOf,
           window: null,
           max_age_seconds: 3600,
-          filter: { environment: null, engine: null, attention_only: attention, shared_group: null },
+          filter: {
+            environment: null,
+            engine: null,
+            attention_only: attention,
+            shared_group: null,
+          },
           sort: "attention",
           page_rows: 20,
           after,
@@ -49,8 +59,16 @@ export function Fleet({
   const metrics = [
     { label: w.resources, value: summary?.evaluated_resources, icon: Database },
     { label: w.incidents, value: summary?.active_incidents, icon: Radio },
-    { label: w.attention, value: summary?.attention_resources, icon: CircleAlert },
-    { label: w.coverage, value: summary?.stale_or_partial_resources, icon: Layers3 },
+    {
+      label: w.attention,
+      value: summary?.attention_resources,
+      icon: CircleAlert,
+    },
+    {
+      label: w.coverage,
+      value: summary?.stale_or_partial_resources,
+      icon: Layers3,
+    },
   ];
   return (
     <>
@@ -81,6 +99,7 @@ export function Fleet({
           </div>
         ))}
       </section>
+      {report && <FleetCharts rows={report.rows} />}
       <section className="panel">
         <div className="panel-head">
           <div>
@@ -120,18 +139,15 @@ export function Fleet({
                 </thead>
                 <tbody>
                   {report.rows.map((row) => {
-                    const href =
-                      "/?" +
-                      new URLSearchParams({
-                        database: row.selector.database,
-                        namespace: row.selector.namespace_id,
-                        revision: connection.revision,
-                        around: row.latest_observed_until ?? row.latest_collected_until,
-                      });
+                    const href = investigationUrl(
+                      connection,
+                      row.selector,
+                      row.latest_observed_until ?? row.latest_collected_until,
+                    );
                     return (
                       <tr key={row.resource_id}>
                         <td>
-                          {canInspect ? (
+                          {canInspect(row.selector) ? (
                             <a className="db-link" href={href}>
                               {row.database_name}
                               <ArrowRight size={14} />
@@ -139,7 +155,9 @@ export function Fleet({
                           ) : (
                             <strong>{row.database_name}</strong>
                           )}
-                          <small>{row.environment ?? row.connection_alias}</small>
+                          <small>
+                            {row.environment ?? row.connection_alias}
+                          </small>
                         </td>
                         <td>{engines[row.engine].label}</td>
                         <td>
@@ -150,7 +168,9 @@ export function Fleet({
                         </td>
                         <td>{row.active_incidents}</td>
                         <td>{row.high_findings}</td>
-                        <td className="timestamp">{stamp(row.latest_collected_until)}</td>
+                        <td className="timestamp">
+                          {stamp(row.latest_collected_until)}
+                        </td>
                       </tr>
                     );
                   })}
@@ -160,7 +180,8 @@ export function Fleet({
             {!report.rows.length && <div className="notice">{w.noRows}</div>}
             <footer className="table-foot">
               <span>
-                {w.pages} {cursors.length} · {report.rows.length} {w.shown.toLowerCase()}
+                {w.pages} {cursors.length} · {report.rows.length}{" "}
+                {w.shown.toLowerCase()}
               </span>
               <div>
                 <button
@@ -185,20 +206,25 @@ export function Fleet({
             </footer>
           </>
         ) : (
-          <StateMessage error={data.status === "error" ? data.message : undefined} />
+          <StateMessage
+            error={data.status === "error" ? data.message : undefined}
+          />
         )}
       </section>
       {report &&
-        (!report.discovery_complete || report.gaps.length > 0 || report.qualifications.length > 0) && (
+        (!report.discovery_complete ||
+          report.gaps.length > 0 ||
+          report.qualifications.length > 0) && (
           <aside className="notice notes">
             <strong>{w.reason}</strong>
             {!report.discovery_complete && <span>{w.partial}</span>}
-            {[...report.gaps.map((g) => g.kind), ...report.qualifications].map((v, i) => (
-              <span key={i}>{v}</span>
-            ))}
+            {[...report.gaps.map((g) => g.kind), ...report.qualifications].map(
+              (v, i) => (
+                <span key={i}>{v}</span>
+              ),
+            )}
           </aside>
         )}
-      {!canInspect && <p className="muted">{w.role}</p>}
     </>
   );
 }

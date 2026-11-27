@@ -1,14 +1,19 @@
 :root {
-  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  color: #202923;
-  background: #f4f6f3;
-  --line: #dce2dc;
+  font-family:
+    "Inter Variable",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  color: #262624;
+  background: #f7f7f4;
+  --line: #deded7;
   --panel: #fff;
-  --subtle: #5a685f;
-  --ink: #202923;
+  --subtle: #64655f;
+  --ink: #262624;
   --green: #206848;
   --soft: #e8f1e8;
-  --muted: #f3f5f1;
+  --muted: #f4f4ef;
   --warn: #8a5915;
   --warning-bg: #f9f0db;
   color-scheme: light;
@@ -42,19 +47,20 @@ button:disabled {
 }
 .top {
   border-bottom: 1px solid var(--line);
-  background: var(--panel);
+  background: #20211e;
+  color: #fafaf5;
 }
 .top-inner,
 main,
 .app-foot {
-  width: min(1330px, 92vw);
+  width: min(1200px, 92vw);
   margin: auto;
 }
 .top-inner {
   display: flex;
   align-items: center;
-  height: 62px;
-  gap: 18px;
+  height: 58px;
+  gap: 10px;
 }
 .brand {
   font-weight: 730;
@@ -71,7 +77,8 @@ main,
 }
 .divider {
   height: 22px;
-  border-left: 1px solid var(--line);
+  border-left: 1px solid #54564d;
+  margin: 0 9px;
 }
 .workspace,
 .crumb,
@@ -173,7 +180,7 @@ small,
 .metric strong {
   font-variant-numeric: tabular-nums;
   font-weight: 600;
-  font-size: 36px;
+  font-size: 38px;
   letter-spacing: -0.06em;
   display: block;
   margin-top: 14px;
@@ -409,11 +416,11 @@ pre {
   :root {
     color-scheme: dark;
     color: #e3eae3;
-    background: #151a17;
+    background: #171816;
     --ink: #e3eae3;
-    --panel: #1c231f;
-    --line: #364239;
-    --subtle: #a9b5ac;
+    --panel: #20211e;
+    --line: #393b34;
+    --subtle: #b3b5aa;
     --green: #8ad3a7;
     --soft: #22392c;
     --muted: #273029;
@@ -501,4 +508,335 @@ figcaption {
   .rail {
     display: none;
   }
+}
+
+.brand-product {
+  font-size: 22px;
+  letter-spacing: -0.06em;
+  color: #ced0c3;
+  font-weight: 420;
+}
+.top .workspace {
+  color: #c3c4ba;
+  font-size: 13px;
+}
+.top .icon-button {
+  background: transparent;
+  color: #e6e7dd;
+  border-color: #4b4e43;
+}
+main {
+  padding-bottom: 3rem;
+}
+.metric span svg {
+  color: var(--green);
+}
+.metric:nth-child(2) span svg {
+  color: var(--signal);
+}
+.metric:nth-child(3) span svg {
+  color: var(--warn);
+}
+.metric:nth-child(4) span svg {
+  color: var(--subtle);
+}
+:root {
+  --signal: #ab491f;
+  --bar: #d77942;
+  --observed: #35775d;
+  --partial: #dfae38;
+  --stale: #c76d42;
+}
+.chart-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin: 0 0 24px;
+}
+.fleet-chart {
+  margin: 0;
+  padding: 20px 22px 16px;
+}
+.fleet-chart figcaption {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 16px;
+  letter-spacing: -0.035em;
+  margin: 0 0 3px;
+}
+.fleet-chart figcaption svg {
+  color: var(--subtle);
+}
+.fleet-chart small,
+.comparison small,
+.panel-head small {
+  font-size: 12px;
+}
+.segments {
+  display: flex;
+  gap: 3px;
+  height: 15px;
+  margin: 22px 0 15px;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.swatch {
+  background: var(--subtle);
+}
+.swatch.observed {
+  background: var(--observed);
+}
+.swatch.stale {
+  background: var(--stale);
+}
+.swatch.partial {
+  background: var(--partial);
+}
+.legend,
+.rank-list {
+  list-style: none;
+  padding: 0;
+}
+.legend {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin: 0;
+}
+.legend li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--subtle);
+}
+.legend b,
+.rank-list b {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.legend .swatch {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+}
+.rank-list {
+  display: grid;
+  gap: 6px;
+  margin: 14px 0 0;
+  font-size: 12px;
+}
+.rank-list li {
+  display: grid;
+  grid-template-columns: minmax(6rem, 1fr) 2fr 1.5rem;
+  align-items: center;
+  gap: 12px;
+}
+.rank-list span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rank-list b {
+  text-align: right;
+}
+.track {
+  background: var(--muted);
+  border-radius: 2px;
+  height: 7px;
+  overflow: hidden;
+}
+.track i {
+  display: block;
+  background: var(--bar);
+  height: 100%;
+  border-radius: inherit;
+}
+.tabs {
+  display: flex;
+  overflow: auto;
+  white-space: nowrap;
+  gap: 24px;
+  border-bottom: 1px solid var(--line);
+  margin: 0 0 20px;
+}
+.tabs a {
+  padding: 12px 1px;
+  color: var(--subtle);
+  text-decoration: none;
+  font-size: 14px;
+}
+.tabs a[aria-current] {
+  box-shadow: inset 0 -3px #dfad20;
+  color: var(--ink);
+  font-weight: 650;
+}
+select {
+  font: inherit;
+  background: var(--panel);
+  color: var(--ink);
+  padding: 5px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+.workload {
+  margin-bottom: 20px;
+}
+.workload label,
+.population,
+.workload td {
+  font-size: 13px;
+}
+.population,
+.comparison {
+  padding: 12px 21px;
+}
+.population {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  background: var(--muted);
+  color: var(--subtle);
+}
+.workload td:first-child {
+  max-width: 36ch;
+  white-space: normal;
+}
+.workload summary {
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.workload summary:hover,
+.resource-list a:hover {
+  text-decoration: underline;
+}
+.query-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: space-between;
+}
+.query-bar .track {
+  width: 5rem;
+}
+.comparison h3 {
+  font-size: 15px;
+}
+.resource-list > div {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--line);
+}
+.resource-list a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+}
+.case-title {
+  justify-content: space-between;
+}
+.case-title a {
+  color: var(--subtle);
+  font-size: 12px;
+}
+.case h2 {
+  font-size: clamp(22px, 2.5vw, 32px);
+}
+.case h3 {
+  letter-spacing: -0.02em;
+}
+.case aside h3 {
+  margin-top: 0;
+}
+.timeline {
+  border-left: 3px solid var(--green);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --green: #83bd9a;
+    --soft: #26382c;
+    --warn: #e8bf70;
+    --warning-bg: #352e21;
+    --signal: #eda57c;
+    --observed: #63a285;
+    --bar: #d88b60;
+  }
+}
+@media (max-width: 720px) {
+  .chart-grid {
+    grid-template-columns: 1fr;
+  }
+  .metrics {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .metric {
+    padding: 15px;
+  }
+  .tabs {
+    gap: 18px;
+  }
+  .top .workspace {
+    font-size: 12px;
+  }
+}
+
+.history-chart {
+  background: var(--panel);
+  padding: 18px 21px 14px;
+  margin: 0;
+}
+.histogram {
+  height: 88px;
+  position: relative;
+  margin: 16px 0 4px;
+  border-bottom: 1px solid var(--line);
+  background: repeating-linear-gradient(
+    to top,
+    transparent 0,
+    transparent 27px,
+    var(--line) 28px,
+    transparent 29px
+  );
+}
+.histogram span {
+  display: block;
+  position: absolute;
+  bottom: 0;
+  border-inline: 2px solid var(--panel);
+  background: var(--observed);
+}
+.histogram [data-selected="true"] {
+  background: var(--bar);
+}
+.histogram .bounded {
+  background: repeating-linear-gradient(
+    -45deg,
+    var(--observed),
+    var(--observed) 3px,
+    var(--panel) 4px
+  );
+}
+.axis,
+.bucket-detail {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 11px;
+  color: var(--subtle);
+}
+.bucket-detail {
+  align-items: center;
+  margin-top: 10px;
+}
+.sql-summary {
+  vertical-align: top;
+  display: inline-block;
+  max-width: calc(100% - 18px);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
 }

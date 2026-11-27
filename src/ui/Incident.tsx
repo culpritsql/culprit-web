@@ -6,21 +6,34 @@ import type { DiagnosticEvidenceRef } from "../../vendor/culprit/app/src/gen/Dia
 import type { PublishedResourceSelector } from "../../vendor/culprit/app/src/gen/PublishedResourceSelector";
 import { api, useRead, type WarehouseConnectionRef } from "./api";
 import { Evidence } from "./Evidence";
+import { activeSection, sectionUrl, type Section } from "./navigation";
+import { WindowData } from "./WindowData";
 import { PublishedWindow } from "./PublishedWindow";
 import { ObservationTimes } from "./ObservationTimes";
 import { StateMessage, stamp } from "./shared";
 import w from "./en.json";
 
-type Archive = { connection: WarehouseConnectionRef; resource: PublishedResourceSelector };
+type Archive = {
+  connection: WarehouseConnectionRef;
+  resource: PublishedResourceSelector;
+};
 
-function Queries({ title, items }: { title: string; items: DerivedIncidentQuery[] }) {
+function Queries({
+  title,
+  items,
+}: {
+  title: string;
+  items: DerivedIncidentQuery[];
+}) {
   if (!items.length) return null;
   return (
     <section>
       <h3>{title}</h3>
       {items.map((query, i) => (
         <div key={i} className="query">
-          <code>{query.sql.state === "available" ? query.sql.text : w.noPayload}</code>
+          <code>
+            {query.sql.state === "available" ? query.sql.text : w.noPayload}
+          </code>
           {query.causal_role && <p>{query.causal_role.explanation.text}</p>}
         </div>
       ))}
@@ -28,7 +41,11 @@ function Queries({ title, items }: { title: string; items: DerivedIncidentQuery[
   );
 }
 
-function Case({ incident, connection, resource }: Archive & { incident: DerivedIncident }) {
+function Case({
+  incident,
+  connection,
+  resource,
+}: Archive & { incident: DerivedIncident }) {
   const [selected, setSelected] = useState<DiagnosticEvidenceRef | null>(null);
   const refs = [
     incident.revision_reference,
@@ -36,7 +53,9 @@ function Case({ incident, connection, resource }: Archive & { incident: DerivedI
     ...incident.culprit_queries.flatMap((q) => q.evidence),
     ...incident.candidate_queries.flatMap((q) => q.evidence),
   ];
-  const originals = [...new Map(refs.map((ref) => [JSON.stringify(ref), ref])).values()];
+  const originals = [
+    ...new Map(refs.map((ref) => [JSON.stringify(ref), ref])).values(),
+  ];
   const entry = incident.entry;
   const permalink = new URL(location.href);
   permalink.searchParams.set("incident", entry.revision_id);
@@ -51,7 +70,11 @@ function Case({ incident, connection, resource }: Archive & { incident: DerivedI
       </div>
       <h2>{entry.title}</h2>
       <p className="lead">{incident.victim_summary}</p>
-      <ObservationTimes first={entry.first_seen_at} last={entry.last_seen_at} recorded={entry.recorded_at} />
+      <ObservationTimes
+        first={entry.first_seen_at}
+        last={entry.last_seen_at}
+        recorded={entry.recorded_at}
+      />
       <div className="case-columns">
         <div>
           {incident.mechanism && (
@@ -78,7 +101,11 @@ function Case({ incident, connection, resource }: Archive & { incident: DerivedI
             {w.at} · {incident.attribution_status}
           </small>
           {originals.map((ref, i) => (
-            <button key={i} className="evidence-button" onClick={() => setSelected(ref)}>
+            <button
+              key={i}
+              className="evidence-button"
+              onClick={() => setSelected(ref)}
+            >
               <span>
                 {ref.stream}
                 <small>{ref.manifest_sha256.slice(0, 16)}…</small>
@@ -112,9 +139,19 @@ export function Incident({
     [connection, resource, around],
   );
   const result = useRead(load);
+  const section = activeSection(new URLSearchParams(location.search));
+  const tabs: Record<Section, string> = {
+    incident: w.progress,
+    workload: w.workload,
+    changes: w.changes,
+    coverage: w.collectionCoverage,
+  };
   const [showWindow, setShowWindow] = useState(false);
   const report = result.status === "ready" ? result.value.report : null;
-  const cases = report?.incidents.filter((i) => !revisionId || i.entry.revision_id === revisionId) ?? [];
+  const cases =
+    report?.incidents.filter(
+      (i) => !revisionId || i.entry.revision_id === revisionId,
+    ) ?? [];
   return (
     <>
       <header className="page-head">
@@ -138,44 +175,87 @@ export function Incident({
         <label>
           <Clock3 size={15} />
           {w.windowAround}
-          <input type="datetime-local" required value={time} onChange={(e) => setTime(e.target.value)} />
+          <input
+            type="datetime-local"
+            required
+            value={time}
+            onChange={(e) => setTime(e.target.value)}
+          />
         </label>
         <button className="button">{w.apply}</button>
       </form>
-      {result.status === "ready" ? (
-        <>
-          {!result.value.report.discovery_complete && <div className="notice">{w.partial}</div>}
-          {cases.length === 0 && <div className="panel notice">{revisionId ? w.missingCase : w.none}</div>}
-          {cases.map((item) => (
-            <Case
-              key={item.analysis_id + item.entry.revision_id}
-              incident={item}
-              connection={connection}
-              resource={resource}
-            />
-          ))}
-          <button
-            className="button"
-            type="button"
-            aria-expanded={showWindow}
-            onClick={() => setShowWindow((open) => !open)}
+      <nav className="tabs" aria-label={w.resourceViews}>
+        {(Object.entries(tabs) as [Section, string][]).map(([key, title]) => (
+          <a
+            key={key}
+            aria-current={section === key ? "page" : undefined}
+            href={sectionUrl(key)}
           >
-            {w.published}
-          </button>
-          {showWindow && (
-            <PublishedWindow connection={connection} resource={resource} report={result.value.report} />
-          )}
-          {[
-            ...result.value.report.gaps.map((g) => g.kind),
-            ...result.value.analysis_limitations.flatMap((l) => l.reasons),
-          ].map((reason, i) => (
-            <p className="muted" key={i}>
-              {reason}
-            </p>
-          ))}
-        </>
+            {title}
+          </a>
+        ))}
+      </nav>
+      {result.status === "ready" ? (
+        section === "changes" ? (
+          <PublishedWindow
+            connection={connection}
+            resource={resource}
+            report={result.value.report}
+          />
+        ) : section === "workload" || section === "coverage" ? (
+          <WindowData
+            connection={connection}
+            resource={resource}
+            report={result.value.report}
+            view={section}
+          />
+        ) : (
+          <>
+            {!result.value.report.discovery_complete && (
+              <div className="notice">{w.partial}</div>
+            )}
+            {cases.length === 0 && (
+              <div className="panel notice">
+                {revisionId ? w.missingCase : w.none}
+              </div>
+            )}
+            {cases.map((item) => (
+              <Case
+                key={item.analysis_id + item.entry.revision_id}
+                incident={item}
+                connection={connection}
+                resource={resource}
+              />
+            ))}
+            <button
+              className="button"
+              type="button"
+              aria-expanded={showWindow}
+              onClick={() => setShowWindow((open) => !open)}
+            >
+              {w.published}
+            </button>
+            {showWindow && (
+              <PublishedWindow
+                connection={connection}
+                resource={resource}
+                report={result.value.report}
+              />
+            )}
+            {[
+              ...result.value.report.gaps.map((g) => g.kind),
+              ...result.value.analysis_limitations.flatMap((l) => l.reasons),
+            ].map((reason, i) => (
+              <p className="muted" key={i}>
+                {reason}
+              </p>
+            ))}
+          </>
+        )
       ) : (
-        <StateMessage error={result.status === "error" ? result.message : undefined} />
+        <StateMessage
+          error={result.status === "error" ? result.message : undefined}
+        />
       )}
     </>
   );

@@ -1,5 +1,6 @@
 use crate::{
-    config::{Config, Permission, Provider},
+    access::Access,
+    config::{Config, Provider},
     session::Expiring,
 };
 use axum::{
@@ -66,11 +67,6 @@ struct Pending {
     verifier: PkceCodeVerifier,
     return_to: String,
 }
-#[derive(Clone, Serialize)]
-pub struct Access {
-    pub inspect_evidence: bool,
-}
-
 pub struct Auth {
     pub config: Config,
     http: reqwest::Client,
@@ -131,31 +127,6 @@ impl Auth {
     }
     pub fn access(&self, headers: &HeaderMap) -> Option<Access> {
         self.sessions.get(cookie(headers, SESSION_COOKIE)?)
-    }
-    fn grants(&self, id: &str, claims: &GrantClaims) -> Option<Access> {
-        let mut access = None;
-        for grant in self
-            .config
-            .auth
-            .grants
-            .iter()
-            .filter(|g| g.provider == id && g.archive == self.config.archive_name)
-        {
-            let Some(value) = claims.0.get(&grant.claim) else {
-                continue;
-            };
-            let matches = value.as_str() == Some(&grant.value)
-                || value
-                    .as_array()
-                    .is_some_and(|items| items.iter().any(|s| s.as_str() == Some(&grant.value)));
-            if matches {
-                let access = access.get_or_insert(Access {
-                    inspect_evidence: false,
-                });
-                access.inspect_evidence |= grant.permissions.contains(&Permission::InspectEvidence);
-            }
-        }
-        access
     }
 }
 
@@ -276,7 +247,12 @@ pub async fn callback(
         .map_err(|_| INVALID)?;
     let verifier = client.id_token_verifier();
     let identity = token.claims(&verifier, &flow.nonce).map_err(|_| INVALID)?;
-    let access = auth.grants(&id, identity.additional_claims()).ok_or((
+    let access = Access::from_claims(
+        &id,
+        &identity.additional_claims().0,
+        &auth.config.auth.grants,
+    )
+    .ok_or((
         StatusCode::FORBIDDEN,
         "Ask your administrator for access to this archive.",
     ))?;

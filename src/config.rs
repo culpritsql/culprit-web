@@ -1,14 +1,55 @@
+use crate::access::NamedResource;
 use serde::Deserialize;
 use std::{collections::HashSet, path::PathBuf};
 use url::Url;
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
+struct ConfigFile {
+    public_url: Url,
+    archive_name: Option<String>,
+    evidence_config: Option<PathBuf>,
+    #[serde(default)]
+    archives: Vec<ArchiveConfig>,
+    auth: AuthConfig,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ArchiveConfig {
+    pub name: String,
+    pub evidence_config: PathBuf,
+}
+
+#[derive(Deserialize)]
+#[serde(try_from = "ConfigFile")]
 pub struct Config {
     pub public_url: Url,
-    pub archive_name: String,
-    pub evidence_config: PathBuf,
+    pub archives: Vec<ArchiveConfig>,
     pub auth: AuthConfig,
+}
+
+impl TryFrom<ConfigFile> for Config {
+    type Error = &'static str;
+    fn try_from(file: ConfigFile) -> Result<Self, Self::Error> {
+        let archives = match (file.archive_name, file.evidence_config) {
+            (Some(name), Some(evidence_config)) if file.archives.is_empty() => {
+                vec![ArchiveConfig {
+                    name,
+                    evidence_config,
+                }]
+            }
+            (None, None) => file.archives,
+            _ => return Err("use archives or a single archive_name and evidence_config pair"),
+        };
+        let config = Self {
+            public_url: file.public_url,
+            archives,
+            auth: file.auth,
+        };
+        config.validate()?;
+        Ok(config)
+    }
 }
 
 #[derive(Deserialize)]
@@ -38,6 +79,7 @@ pub struct Grant {
     pub claim: String,
     pub value: String,
     pub permissions: Vec<Permission>,
+    pub resources: Option<Vec<NamedResource>>,
 }
 
 #[derive(Clone, Copy, PartialEq, Deserialize)]
@@ -64,10 +106,16 @@ impl Config {
                 "public_url must be an HTTPS origin (HTTP loopback is supported for development)",
             );
         }
-        if self.archive_name.trim().is_empty()
-            || self.auth.providers.is_empty()
-            || self.auth.grants.is_empty()
-        {
+        let mut archives = HashSet::new();
+        for archive in &self.archives {
+            if archive.name.trim().is_empty()
+                || !archives.insert(archive.name.as_str())
+                || archive.evidence_config.as_os_str().is_empty()
+            {
+                return Err("each archive needs a unique name and an evidence configuration");
+            }
+        }
+        if archives.is_empty() || self.auth.providers.is_empty() || self.auth.grants.is_empty() {
             return Err(
                 "configure a named archive, an identity provider and an explicit access grant",
             );
@@ -86,10 +134,16 @@ impl Config {
         }
         for grant in &self.auth.grants {
             if !ids.contains(&grant.provider)
-                || grant.archive != self.archive_name
+                || !archives.contains(grant.archive.as_str())
                 || grant.claim.is_empty()
                 || grant.value.is_empty()
                 || grant.permissions.is_empty()
+                || grant.resources.as_ref().is_some_and(|items| {
+                    items.is_empty()
+                        || items
+                            .iter()
+                            .any(|r| r.label.trim().is_empty() || r.selector.validate().is_err())
+                })
             {
                 return Err("access grant must match a configured provider and archive");
             }
@@ -125,7 +179,7 @@ mod tests {
         assert!(config.validate().is_ok());
         config.auth.grants[0].archive = "unconfigured".into();
         assert!(config.validate().is_err());
-        config.auth.grants[0].archive = config.archive_name.clone();
+        config.auth.grants[0].archive = config.archives[0].name.clone();
         config.auth.grants[0].provider = "unconfigured".into();
         assert!(config.validate().is_err());
     }
