@@ -20,6 +20,7 @@ import {
 } from "./navigation";
 import { THEMES, setThemeChoice } from "./themes";
 import type { Engine } from "../../vendor/culprit/app/src/gen/Engine";
+import type { WarehouseFleetRow } from "../../vendor/culprit/app/src/gen/WarehouseFleetRow";
 import type { WarehouseConnectionRef, PublishedResourceSelector } from "./api";
 
 export interface PaletteResource {
@@ -29,6 +30,13 @@ export interface PaletteResource {
   archive: WarehouseConnectionRef;
   selector: PublishedResourceSelector;
   around: string;
+  freshness?: WarehouseFleetRow["freshness"];
+  sharedGroup?: WarehouseFleetRow["shared_group"];
+  activeIncidents?: number;
+  cpuPct?: number | null;
+  memoryPct?: number | null;
+  dominantWait?: string | null;
+  latestCollectedUntil?: string;
 }
 
 export interface PaletteDemoScenario {
@@ -47,14 +55,11 @@ interface Item {
 }
 
 const SECTION_ITEMS: { key: Section; label: string }[] = [
-  { key: "incident", label: "Investigation" },
+  { key: "incident", label: "Triage" },
   { key: "resources", label: "Resources & waits" },
   { key: "workload", label: "Workload & Top SQL" },
-  { key: "timeline", label: "Incident timeline" },
-  { key: "operations", label: "Operations" },
-  { key: "schema", label: "Schema and indexes" },
-  { key: "changes", label: "Findings and changes" },
-  { key: "coverage", label: "Collection coverage" },
+  { key: "schema", label: "Schema & advisors" },
+  { key: "timeline", label: "Timeline & coverage" },
 ];
 
 export function CommandPalette({

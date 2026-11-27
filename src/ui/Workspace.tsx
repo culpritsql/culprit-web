@@ -109,6 +109,13 @@ export function Workspace({
           archive: connection,
           selector: r.selector,
           around: r.latest_observed_until ?? r.latest_collected_until,
+          freshness: r.freshness,
+          sharedGroup: r.shared_group,
+          activeIncidents: r.active_incidents,
+          cpuPct: r.telemetry?.cpu_pct ?? null,
+          memoryPct: r.telemetry?.memory_pct ?? null,
+          dominantWait: r.telemetry?.dominant_wait ?? null,
+          latestCollectedUntil: r.latest_collected_until,
         }));
       setKnownResources((prev) => {
         const filtered = prev.filter(
@@ -139,10 +146,36 @@ export function Workspace({
         r.selector.database === resource.database,
     );
     if (hit) {
+      const poolSiblings = hit.sharedGroup
+        ? knownResources
+            .filter(
+              (r) =>
+                r.archive.name === connection.name &&
+                r.sharedGroup?.member_id === hit.sharedGroup?.member_id &&
+                (r.selector.namespace_id !== resource.namespace_id ||
+                  r.selector.database !== resource.database),
+            )
+            .map((s) => ({
+              name: s.name,
+              selector: s.selector,
+              around: s.around,
+              activeIncidents: s.activeIncidents ?? 0,
+              cpuPct: s.cpuPct ?? null,
+              dominantWait: s.dominantWait ?? null,
+            }))
+        : [];
       return {
         name: hit.name,
         engine: hit.engine,
         environment: hit.environment,
+        freshness: hit.freshness,
+        sharedGroup: hit.sharedGroup,
+        activeIncidents: hit.activeIncidents,
+        cpuPct: hit.cpuPct,
+        memoryPct: hit.memoryPct,
+        dominantWait: hit.dominantWait,
+        latestCollectedUntil: hit.latestCollectedUntil,
+        poolSiblings,
       };
     }
     const grantRes = access.archives[connection.name]?.resources.find(

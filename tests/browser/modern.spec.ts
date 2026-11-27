@@ -19,6 +19,17 @@ test("multi-theme switcher, clean routing, scroll stability, telemetry, schema/o
       name: "What needs attention across the estate",
     }),
   ).toBeVisible();
+  // Verify blind / unreachable collector targets are promoted directly into global triage
+  await expect(
+    page.getByText("collector unreachable · blind target"),
+  ).toBeVisible();
+
+  // Verify global UTC / Local timezone toggle updates timestamps reactively
+  const tzBtn = page.getByRole("button", { name: "Toggle display timezone" });
+  await expect(tzBtn).toContainText("UTC");
+  await tzBtn.click();
+  await tzBtn.click();
+  await expect(tzBtn).toContainText("UTC");
 
   // Regional topology -> open US Demo estate on clean /archives/... path
   await page
@@ -60,9 +71,31 @@ test("multi-theme switcher, clean routing, scroll stability, telemetry, schema/o
   await page.getByRole("button", { name: /Culprit Obsidian/ }).click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "obsidian");
 
-  // Open Checkout -> verify Telemetry correlation strip has ZERO layout shift on hover
+  // Open Checkout -> verify 2AM DRI Triage: Situation Banner, Pool/Sibling Pill, Caller Attribution, 1-Click Plan Drawer, and Correlation Strip
   await page.getByRole("link", { name: "Checkout", exact: true }).click();
   await expect(page).toHaveURL(/\/archives\/Demo%20estate\/investigate\/incident/);
+  await expect(page.getByText("RECOVERED · ROOT CAUSE RETAINED")).toBeVisible();
+  await expect(page.getByText("pool-commerce · 2 DBs")).toBeVisible();
+  await expect(page.getByRole("link", { name: /Sibling Ledger: 1 active/ })).toBeVisible();
+  await expect(page.getByText("payment-worker", { exact: true })).toBeVisible();
+  await expect(page.getByText("checkout-api", { exact: true })).toBeVisible();
+
+  // Verify 1-click Slack brief & coding agent prompt actions
+  await page.getByRole("button", { name: "Copy incident brief" }).click();
+  await expect(page.getByText("Copied brief")).toBeVisible();
+
+  // Verify 1-click SQL & Execution Plan Drawer directly from Triage without switching tabs
+  await page
+    .getByRole("button", { name: /Inspect SQL & execution plan/ })
+    .first()
+    .click();
+  const triageDrawer = page.getByRole("dialog", { name: "Statement inspector" });
+  await expect(triageDrawer).toBeVisible();
+  await triageDrawer
+    .getByRole("button", { name: "Close statement inspector" })
+    .click();
+  await expect(triageDrawer).toHaveCount(0);
+
   const corrStrip = page.getByRole("region", {
     name: "Synchronized window telemetry",
   });
@@ -104,8 +137,8 @@ test("multi-theme switcher, clean routing, scroll stability, telemetry, schema/o
     page.getByRole("heading", { name: /SQL Server Agent jobs/ }),
   ).toBeVisible();
 
-  // Verify Schema and indexes & Operations tabs have rich catalog + findings + SQL remediation
-  await page.getByRole("link", { name: "Schema and indexes", exact: true }).click();
+  // Verify unified Schema & advisors hub has rich catalog + all findings + inline filter pills
+  await page.getByRole("link", { name: "Schema & advisors", exact: true }).click();
   await expect(page).toHaveURL(/\/archives\/Demo%20estate\/investigate\/schema/);
   await expect(
     page.getByRole("heading", { name: "Schema & index catalog" }),
@@ -118,9 +151,10 @@ test("multi-theme switcher, clean routing, scroll stability, telemetry, schema/o
   await expect(
     page.getByText(/Key lookup on shop\.customers/),
   ).toBeVisible();
-
-  await page.getByRole("link", { name: "Operations", exact: true }).click();
-  await expect(page).toHaveURL(/\/archives\/Demo%20estate\/investigate\/operations/);
+  await expect(
+    page.getByText(/READ_COMMITTED_SNAPSHOT is OFF/),
+  ).toBeVisible();
+  await page.getByRole("button", { name: /^Operations & config/ }).click();
   await expect(
     page.getByText(/READ_COMMITTED_SNAPSHOT is OFF/),
   ).toBeVisible();
@@ -184,7 +218,8 @@ test("multi-theme switcher, clean routing, scroll stability, telemetry, schema/o
       name: "Read-replica WAL replay lag exceeded 18 seconds",
     }),
   ).toBeVisible();
-  await page.getByRole("link", { name: "Schema and indexes", exact: true }).click();
+  await expect(page.getByText("ONGOING INCIDENT")).toBeVisible();
+  await page.getByRole("link", { name: "Schema & advisors", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "Schema & index catalog" }),
   ).toBeVisible();
@@ -214,7 +249,7 @@ test("multi-theme switcher, clean routing, scroll stability, telemetry, schema/o
   await expect(
     page.getByText(/Unused index idx_sku_prices_old_promo/),
   ).toBeVisible();
-  await page.getByRole("link", { name: "Schema and indexes", exact: true }).click();
+  await page.getByRole("link", { name: "Schema & advisors", exact: true }).click();
   await expect(
     page.getByText("idx_products_attributes_gin", { exact: true }),
   ).toBeVisible();

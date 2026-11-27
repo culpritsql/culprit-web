@@ -1,4 +1,5 @@
 import { AlertCircle, LoaderCircle } from "lucide-react";
+import { getClockZone } from "./clock";
 import words from "./en.json";
 
 export function StateMessage({ error }: { error?: string }) {
@@ -16,30 +17,69 @@ export function StateMessage({ error }: { error?: string }) {
 
 export function stamp(value: string) {
   const d = new Date(value);
-  return Number.isNaN(d.valueOf())
-    ? value
-    : new Intl.DateTimeFormat("en-GB", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-        hourCycle: "h23",
-        timeZone: "UTC",
-      }).format(d) + " UTC";
+  if (Number.isNaN(d.valueOf())) return value;
+  if (getClockZone() === "local") {
+    return new Intl.DateTimeFormat("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hourCycle: "h23",
+      timeZoneName: "short",
+    }).format(d);
+  }
+  return (
+    new Intl.DateTimeFormat("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hourCycle: "h23",
+      timeZone: "UTC",
+    }).format(d) + " UTC"
+  );
 }
 
 export function shortTime(value: string) {
   const d = new Date(value);
-  return Number.isNaN(d.valueOf())
-    ? value
-    : new Intl.DateTimeFormat("en-GB", {
-        hour: "2-digit",
-        minute: "2-digit",
-        hourCycle: "h23",
-        timeZone: "UTC",
-      }).format(d) + " UTC";
+  if (Number.isNaN(d.valueOf())) return value;
+  if (getClockZone() === "local") {
+    return new Intl.DateTimeFormat("en-GB", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+      timeZoneName: "short",
+    }).format(d);
+  }
+  return (
+    new Intl.DateTimeFormat("en-GB", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+      timeZone: "UTC",
+    }).format(d) + " UTC"
+  );
+}
+
+export function formatDurationMs(ms: number): string {
+  if (!Number.isFinite(ms) || ms <= 0) return "0s";
+  if (ms < 1000) return `${Math.round(ms)}ms`;
+  const sec = Math.round(ms / 1000);
+  if (sec < 60) {
+    return ms < 10_000 ? `${(ms / 1000).toFixed(1)}s` : `${sec}s`;
+  }
+  const min = Math.floor(sec / 60);
+  const remSec = sec % 60;
+  if (min < 60) {
+    return remSec > 0 ? `${min}m ${remSec}s` : `${min}m`;
+  }
+  const hr = Math.floor(min / 60);
+  const remMin = min % 60;
+  return remMin > 0 ? `${hr}h ${remMin}m` : `${hr}h`;
 }
 
 export function relativeAge(iso: string, referenceIso?: string): string {
@@ -47,11 +87,18 @@ export function relativeAge(iso: string, referenceIso?: string): string {
   const now = referenceIso ? Date.parse(referenceIso) : Date.now();
   if (!Number.isFinite(target) || !Number.isFinite(now)) return "";
   const diffSec = Math.max(0, Math.round((now - target) / 1000));
+  if (diffSec < 3) return "just now";
   if (diffSec < 60) return `${diffSec}s ago`;
+  if (diffSec < 120) {
+    const rem = diffSec % 60;
+    return rem > 0 ? `1m ${rem}s ago` : "1m ago";
+  }
   const diffMin = Math.round(diffSec / 60);
   if (diffMin < 60) return `${diffMin}m ago`;
-  const diffHr = Math.round(diffMin / 60);
-  if (diffHr < 48) return `${diffHr}h ago`;
+  const diffHr = Math.floor(diffMin / 60);
+  const remMin = diffMin % 60;
+  if (diffHr < 6 && remMin > 0) return `${diffHr}h ${remMin}m ago`;
+  if (diffHr < 48) return `${Math.round(diffMin / 60)}h ago`;
   return `${Math.round(diffHr / 24)}d ago`;
 }
 

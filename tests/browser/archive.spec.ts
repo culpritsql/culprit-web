@@ -372,19 +372,24 @@ test("an explicit UTC range stays selected across workload, operational and sche
       "No compatible workload intervals were returned for this window.",
     ),
   ).toBeVisible();
-  await page.getByRole("link", { name: "Operations", exact: true }).click();
-  await expect(page.getByText("Historical setting difference")).toBeVisible();
   await page
-    .getByRole("link", { name: "Schema and indexes", exact: true })
+    .getByRole("link", { name: "Schema & advisors", exact: true })
     .click();
+  await expect(page.getByText("Historical setting difference")).toBeVisible();
+  await page.getByRole("button", { name: /^Indexes & DDL/ }).click();
   await expect(
     page.getByText(
       "No matching findings or changes in this published analysis.",
     ),
   ).toBeVisible();
-  await page.getByRole("link", { name: "Timeline", exact: true }).click();
+  await page
+    .getByRole("link", { name: "Timeline & coverage", exact: true })
+    .click();
   await expect(
     page.getByRole("heading", { name: "Incident revisions" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Original evidence coverage" }),
   ).toBeVisible();
 });
 

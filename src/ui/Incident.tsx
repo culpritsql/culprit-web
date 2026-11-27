@@ -1,6 +1,14 @@
-import { useCallback, useState } from "react";
-import { CheckCircle2, ArrowRight } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import {
+  AlertTriangle,
+  ArrowRight,
+  ArrowUpRight,
+  CheckCircle2,
+  FolderGit2,
+  Radio,
+} from "lucide-react";
 import type { Engine } from "../../vendor/culprit/app/src/gen/Engine";
+import type { WarehouseFleetRow } from "../../vendor/culprit/app/src/gen/WarehouseFleetRow";
 import type { WarehouseIncidentView } from "../../vendor/culprit/app/src/gen/WarehouseIncidentView";
 import type { WarehouseWindowReport } from "../../vendor/culprit/app/src/gen/WarehouseWindowReport";
 import {
@@ -8,10 +16,12 @@ import {
   useRead,
   useReadDefaults,
   type ArchiveScope,
+  type PublishedResourceSelector,
 } from "./api";
 import { EngineBadge } from "./EngineBadge";
 import {
   activeSection,
+  investigationUrl,
   sectionUrl,
   spaClick,
   useLocationHref,
@@ -25,37 +35,224 @@ import { IncidentTimeline } from "./IncidentTimeline";
 import { useLiveTick } from "./livePulse";
 import { MissionTimeline } from "./MissionTimeline";
 import { PublishedWindow } from "./PublishedWindow";
-import { WindowData } from "./WindowData";
-import { StateMessage, humanizeGap, pct, stamp } from "./shared";
+import { Coverage, WindowData } from "./WindowData";
+import {
+  StateMessage,
+  formatDurationMs,
+  humanizeGap,
+  pct,
+  relativeAge,
+  stamp,
+} from "./shared";
 import w from "./en.json";
+
+export interface PoolSiblingMeta {
+  name: string;
+  selector: PublishedResourceSelector;
+  around: string;
+  activeIncidents: number;
+  cpuPct: number | null;
+  dominantWait: string | null;
+}
 
 export interface KnownDatabaseMeta {
   name: string;
   engine: Engine | null;
   environment?: string | null;
+  freshness?: WarehouseFleetRow["freshness"];
+  sharedGroup?: WarehouseFleetRow["shared_group"];
+  activeIncidents?: number;
+  cpuPct?: number | null;
+  memoryPct?: number | null;
+  dominantWait?: string | null;
+  latestCollectedUntil?: string;
+  poolSiblings?: PoolSiblingMeta[];
 }
 
 const tabs: Record<Section, string> = {
   incident: w.progress,
   resources: w.resourcesTab,
   workload: w.workload,
-  timeline: w.timeline,
-  operations: w.operations,
   schema: w.schema,
-  changes: w.changes,
-  coverage: w.collectionCoverage,
+  timeline: w.timeline,
 };
+
+function SituationBanner({
+  view,
+  windowReport,
+  knownMeta,
+}: {
+  view: WarehouseIncidentView;
+  windowReport: WarehouseWindowReport | null;
+  knownMeta?: KnownDatabaseMeta | null;
+}) {
+  const { report } = view;
+  const incidents = report.incidents;
+  const activeCases = incidents.filter((i) => i.entry.lifecycle === "active");
+  const resolvedCases = incidents.filter(
+    (i) => i.entry.lifecycle === "resolved",
+  );
+  const isStale =
+    knownMeta?.freshness === "stale" || knownMeta?.freshness === "partial";
+
+  const latestSample = windowReport?.telemetry?.resources
+    .flatMap((r) => r.samples)
+    .at(-1);
+  const latestBlocking = windowReport?.telemetry?.activity
+    .map((a) => a.blocking)
+    .filter((b): b is NonNullable<typeof b> => Boolean(b))
+    .at(-1);
+  const headChain = latestBlocking?.blocking?.chains[0];
+  const deadlocks = windowReport?.telemetry?.deadlocks ?? [];
+  const latestRep = windowReport?.telemetry?.replication?.at(-1)?.report;
+
+  if (isStale) {
+    const lastCapture = knownMeta?.latestCollectedUntil ?? report.until;
+    return (
+      <section
+        className="situation-banner situation-stale"
+        aria-label="Database telemetry freshness alert"
+      >
+        <div className="situation-main">
+          <span className="situation-pill pill-stale">
+            <AlertTriangle size={13} />
+            TELEMETRY {knownMeta?.freshness?.toUpperCase()}
+          </span>
+          <div className="situation-copy">
+            <strong>
+              Last archive capture was{" "}
+              {relativeAge(lastCapture, report.recorded_before) ||
+                stamp(lastCapture)}
+            </strong>
+            <span>
+              Metrics below reflect {stamp(lastCapture)} — verify collector
+              connectivity before trusting low resource numbers.
+            </span>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  if (activeCases.length > 0) {
+    const primary = activeCases[0]!;
+    const startedAge = relativeAge(
+      primary.entry.first_seen_at,
+      report.recorded_before,
+    );
+    const spanMs =
+      Date.parse(primary.entry.last_seen_at) -
+      Date.parse(primary.entry.first_seen_at);
+
+    return (
+      <section
+        className="situation-banner situation-ongoing"
+        aria-label="Live database situation"
+      >
+        <div className="situation-main">
+          <span className="situation-pill pill-ongoing">
+            <Radio size={13} />
+            ONGOING INCIDENT
+          </span>
+          <div className="situation-copy">
+            <strong>
+              {activeCases.length === 1
+                ? primary.entry.title
+                : `${activeCases.length} active incidents under triage`}
+            </strong>
+            <span>
+              Started {startedAge || stamp(primary.entry.first_seen_at)}
+              {spanMs > 0 ? ` · active for ${formatDurationMs(spanMs)}` : ""}
+              {headChain
+                ? ` · ${headChain.waiters} blocked behind Session ${headChain.head}${headChain.tree.context?.application ? ` (${headChain.tree.context.application})` : ""}`
+                : deadlocks.length > 0
+                  ? ` · ${deadlocks.length} deadlock cycles captured`
+                  : latestRep
+                    ? ` · ${latestRep.summary}`
+                    : ""}
+            </span>
+          </div>
+        </div>
+        {latestSample && (
+          <div className="situation-kpis">
+            <span>
+              CPU <b>{pct(latestSample.cpu_pct)}</b>
+            </span>
+            <span>
+              MEM <b>{pct(latestSample.memory_pct)}</b>
+            </span>
+            {latestSample.data_io_pct != null && (
+              <span>
+                I/O <b>{pct(latestSample.data_io_pct)}</b>
+              </span>
+            )}
+          </div>
+        )}
+      </section>
+    );
+  }
+
+  if (resolvedCases.length > 0) {
+    const latest = resolvedCases[0]!;
+    const resolvedAge = relativeAge(
+      latest.entry.last_seen_at,
+      report.recorded_before,
+    );
+    const spanMs =
+      Date.parse(latest.entry.last_seen_at) -
+      Date.parse(latest.entry.first_seen_at);
+
+    return (
+      <section
+        className="situation-banner situation-recovered"
+        aria-label="Live database situation"
+      >
+        <div className="situation-main">
+          <span className="situation-pill pill-recovered">
+            <CheckCircle2 size={13} />
+            RECOVERED · ROOT CAUSE RETAINED
+          </span>
+          <div className="situation-copy">
+            <strong>
+              Resolved {resolvedAge || stamp(latest.entry.last_seen_at)}
+              {spanMs > 0 ? ` · lasted ${formatDurationMs(spanMs)}` : ""}
+            </strong>
+            <span>
+              {headChain
+                ? `Peak impact: ${headChain.waiters} sessions blocked (${formatDurationMs(headChain.longest_wait_ms ?? 0)} max wait) behind ${headChain.tree.context?.application ?? `Session ${headChain.head}`}`
+                : "Immediate contention drained — causal chain and code remediation preserved below."}
+            </span>
+          </div>
+        </div>
+        {latestSample && (
+          <div className="situation-kpis">
+            <span>
+              CPU <b>{pct(latestSample.cpu_pct)}</b>
+            </span>
+            <span>
+              MEM <b>{pct(latestSample.memory_pct)}</b>
+            </span>
+          </div>
+        )}
+      </section>
+    );
+  }
+
+  return null;
+}
 
 function Cases({
   scope,
   view,
   windowReport,
   revisionId,
+  knownMeta,
 }: {
   scope: ArchiveScope;
   view: WarehouseIncidentView;
   windowReport: WarehouseWindowReport | null;
   revisionId: string | null;
+  knownMeta?: KnownDatabaseMeta | null;
 }) {
   const [published, setPublished] = useState(false);
   const { report } = view;
@@ -79,6 +276,11 @@ function Cases({
 
   return (
     <>
+      <SituationBanner
+        view={view}
+        windowReport={windowReport}
+        knownMeta={knownMeta}
+      />
       <MissionTimeline
         windowReport={windowReport}
         incidentReport={report}
@@ -125,14 +327,22 @@ function Cases({
             </div>
           )}
           <div className="healthy-quick-links">
-            <a className="chip" href={sectionUrl("resources")} onClick={spaClick}>
+            <a
+              className="chip"
+              href={sectionUrl("resources")}
+              onClick={spaClick}
+            >
               Inspect CPU, memory &amp; waits <ArrowRight size={12} />
             </a>
-            <a className="chip" href={sectionUrl("workload")} onClick={spaClick}>
+            <a
+              className="chip"
+              href={sectionUrl("workload")}
+              onClick={spaClick}
+            >
               Top SQL workload <ArrowRight size={12} />
             </a>
             <a className="chip" href={sectionUrl("schema")} onClick={spaClick}>
-              Schema &amp; index catalog <ArrowRight size={12} />
+              Browse schema &amp; index catalog <ArrowRight size={12} />
             </a>
           </div>
         </section>
@@ -141,6 +351,11 @@ function Cases({
         <IncidentCase
           key={item.analysis_id + item.entry.revision_id}
           incident={item}
+          windowReport={windowReport}
+          dbName={knownMeta?.name}
+          engine={knownMeta?.engine}
+          environment={knownMeta?.environment}
+          referenceIso={report.recorded_before}
           {...scope}
         />
       ))}
@@ -176,6 +391,7 @@ type Content = {
   view: WarehouseIncidentView | null;
   windowReport: WarehouseWindowReport | null;
   revisionId: string | null;
+  knownMeta?: KnownDatabaseMeta | null;
 };
 
 function ViewContent({
@@ -185,24 +401,32 @@ function ViewContent({
   view,
   windowReport,
   revisionId,
+  knownMeta,
 }: Content) {
   switch (section) {
-    case "changes":
-    case "operations":
     case "schema":
-      return <PublishedWindow {...scope} report={range} area={section} />;
-    case "coverage":
+      return <PublishedWindow {...scope} report={range} showCatalog />;
     case "workload":
     case "resources":
       return <WindowData {...scope} report={range} view={section} />;
     case "timeline":
       return (
         view && (
-          <IncidentTimeline
-            {...scope}
-            report={view.report}
-            windowReport={windowReport}
-          />
+          <div className="timeline-coverage-stack">
+            <MissionTimeline
+              windowReport={windowReport}
+              incidentReport={view.report}
+              range={range}
+            />
+            <IncidentTimeline
+              {...scope}
+              report={view.report}
+              windowReport={windowReport}
+            />
+            {windowReport && (
+              <Coverage originals={windowReport.originals} range={range} />
+            )}
+          </div>
         )
       );
     case "incident":
@@ -213,10 +437,20 @@ function ViewContent({
             view={view}
             windowReport={windowReport}
             revisionId={revisionId}
+            knownMeta={knownMeta}
           />
         )
       );
   }
+}
+
+interface TabBadges {
+  incident?: number;
+  incidentActive?: boolean;
+  resources?: number;
+  workload?: number;
+  schema?: number;
+  timeline?: number;
 }
 
 export function Incident({
@@ -236,6 +470,10 @@ export function Incident({
   const liveTick = useLiveTick();
   const section = activeSection();
   const { window_page_rows: pageRows } = useReadDefaults();
+  const [cachedBadges, setCachedBadges] = useState<{
+    key: string;
+    badges: TabBadges;
+  } | null>(null);
 
   const boundsFrom = bounds?.from ?? null;
   const boundsUntil = bounds?.until ?? null;
@@ -314,14 +552,59 @@ export function Incident({
     ],
   );
 
-  const result = useRead(
-    load,
-    `incident:${connection.name}:${resource.database}:${section}`,
-  );
+  const dbScopeKey = `${connection.name}:${resource.database}`;
+  const result = useRead(load, `incident:${dbScopeKey}:${section}`);
   const view = result.status === "ready" ? result.value.incident : null;
   const windowReport =
     result.status === "ready" ? result.value.windowReport : null;
   const range = bounds ?? view?.report;
+
+  useEffect(() => {
+    if (!view && !windowReport) return;
+    const incList = view?.report.incidents ?? windowReport?.incidents.incidents ?? [];
+    const activeAny = incList.some((i) => i.entry.lifecycle === "active");
+    const waitingCount =
+      windowReport?.telemetry?.activity
+        .map((a) => a.blocking?.blocking?.waiting ?? 0)
+        .reduce((m, v) => Math.max(m, v), 0) ?? 0;
+    const deadlockCount = windowReport?.telemetry?.deadlocks.length ?? 0;
+    const queries =
+      windowReport?.workload.kind === "evaluated"
+        ? (windowReport.workload.analysis.sections[0]?.analysis.workload
+            ?.queries ?? [])
+        : [];
+    const planFlips = queries.filter(
+      (q) => q.plan && q.plan_history?.captured_plan,
+    ).length;
+    const advisorItems = (windowReport?.published ?? []).reduce(
+      (sum, p) => sum + p.findings.length + p.changes.length,
+      0,
+    );
+    const revCount =
+      (view?.report.history.entries.length ?? 0) +
+      (windowReport?.originals.length ?? 0);
+
+    setCachedBadges((prev) => {
+      const base = prev?.key === dbScopeKey ? prev.badges : {};
+      return {
+        key: dbScopeKey,
+        badges: {
+          incident: incList.length || base.incident,
+          incidentActive: activeAny || base.incidentActive,
+          resources:
+            waitingCount + deadlockCount > 0
+              ? waitingCount + deadlockCount
+              : base.resources,
+          workload: planFlips > 0 ? planFlips : base.workload,
+          schema: advisorItems > 0 ? advisorItems : base.schema,
+          timeline: revCount > 0 ? revCount : base.timeline,
+        },
+      };
+    });
+  }, [dbScopeKey, view, windowReport]);
+
+  const badges = cachedBadges?.key === dbScopeKey ? cachedBadges.badges : {};
+
   const firstDisplay = view?.report.incidents[0]?.display;
   const dbTitle =
     knownMeta?.name ??
@@ -329,6 +612,11 @@ export function Incident({
     firstDisplay?.connection_alias ??
     tabs[section];
   const envBadge = knownMeta?.environment ?? firstDisplay?.environment ?? null;
+  const sharedGroup = knownMeta?.sharedGroup ?? null;
+  const poolSiblings = knownMeta?.poolSiblings ?? [];
+  const noisySibling = poolSiblings.find(
+    (s) => s.activeIncidents > 0 || (s.cpuPct ?? 0) >= 85,
+  );
 
   return (
     <>
@@ -343,27 +631,83 @@ export function Incident({
                 {envBadge}
               </span>
             )}
+            {sharedGroup && (
+              <span
+                className="pool-context-pill"
+                title={`Shared ${sharedGroup.member_kind}: ${sharedGroup.label}`}
+              >
+                <FolderGit2 size={12} />
+                <span>
+                  {sharedGroup.label} · {poolSiblings.length + 1} DBs
+                </span>
+              </span>
+            )}
+            {noisySibling && (
+              <a
+                className="noisy-neighbor-pill"
+                href={investigationUrl(
+                  connection,
+                  noisySibling.selector,
+                  noisySibling.around,
+                  "incident",
+                )}
+                onClick={spaClick}
+              >
+                <AlertTriangle size={12} />
+                <span>
+                  Sibling {noisySibling.name}:{" "}
+                  {noisySibling.activeIncidents > 0
+                    ? `${noisySibling.activeIncidents} active`
+                    : `CPU ${noisySibling.cpuPct}%`}
+                </span>
+                <ArrowUpRight size={12} />
+              </a>
+            )}
           </div>
           <p>
             {w.report} · {stamp(around)}
+            {range && (
+              <span className="head-rel-age">
+                {" "}
+                · window {relativeAge(around, range.recorded_before)}
+              </span>
+            )}
           </p>
         </div>
         {range && <RangeSelection range={range} />}
       </header>
+
       <nav className="tabs" aria-label={w.resourceViews}>
-        {(Object.entries(tabs) as [Section, string][]).map(([key, label]) => (
-          <a
-            key={key}
-            aria-current={key === section ? "page" : undefined}
-            href={sectionUrl(key)}
-            onClick={spaClick}
-          >
-            {label}
-          </a>
-        ))}
+        {(Object.entries(tabs) as [Section, string][]).map(([key, label]) => {
+          const count = badges[key];
+          const isDanger =
+            (key === "incident" && badges.incidentActive) ||
+            (key === "resources" && (count ?? 0) > 0);
+          return (
+            <a
+              key={key}
+              aria-current={key === section ? "page" : undefined}
+              href={sectionUrl(key)}
+              onClick={spaClick}
+            >
+              <span>{label}</span>
+              {count !== undefined && count > 0 && (
+                <span
+                  className={`tab-badge ${isDanger ? "tab-badge-danger" : ""}`}
+                  aria-hidden="true"
+                >
+                  {count}
+                </span>
+              )}
+            </a>
+          );
+        })}
       </nav>
+
       {result.status === "ready" && range ? (
-        <ErrorBoundary resetKey={`${connection.name}:${resource.database}:${section}`}>
+        <ErrorBoundary
+          resetKey={`${connection.name}:${resource.database}:${section}`}
+        >
           <ViewContent
             scope={{ connection, resource }}
             section={section}
@@ -371,6 +715,7 @@ export function Incident({
             windowReport={windowReport}
             range={range}
             revisionId={revisionId}
+            knownMeta={knownMeta}
           />
         </ErrorBoundary>
       ) : (

@@ -10,7 +10,13 @@ import {
 } from "lucide-react";
 import type { WarehouseWindowReport } from "../../vendor/culprit/app/src/gen/WarehouseWindowReport";
 import type { IncidentReadReport } from "../../vendor/culprit/app/src/gen/IncidentReadReport";
-import { navigate, rangeUrl, spaClick, type ArchiveRange } from "./navigation";
+import {
+  navigate,
+  rangeUrl,
+  sectionUrl,
+  spaClick,
+  type ArchiveRange,
+} from "./navigation";
 import { pct, quantity, shortTime, stamp, waitTone } from "./shared";
 
 function formatSpan(ms: number): string {
@@ -610,21 +616,37 @@ export function MissionTimeline({
                   ((ev.until - ev.from) / spanMs) * 96,
                 );
                 return ev.kind === "incident" ? (
-                  <span
+                  <button
+                    type="button"
                     key={ev.id}
                     className="corr-incident-span"
                     style={{
                       left: `${safeLeft}%`,
                       width: `${Math.min(98 - safeLeft, safeWidth)}%`,
                     }}
-                    title={ev.label}
+                    title={`${ev.label} — click to jump to triage`}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={() => {
+                      const el = document.querySelector("article.case");
+                      if (el) el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+                      else navigate(sectionUrl("incident"));
+                    }}
                   />
                 ) : (
-                  <span
+                  <button
+                    type="button"
                     key={ev.id}
                     className={`corr-event-diamond kind-${ev.kind}`}
                     style={{ left: `${safeLeft}%` }}
-                    title={ev.label}
+                    title={`${ev.label} — click to inspect`}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={() =>
+                      navigate(
+                        ev.kind === "deadlock"
+                          ? sectionUrl("resources")
+                          : sectionUrl("schema"),
+                      )
+                    }
                   />
                 );
               })}

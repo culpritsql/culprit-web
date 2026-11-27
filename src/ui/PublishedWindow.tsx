@@ -51,14 +51,17 @@ export function PublishedWindow({
   connection,
   resource,
   report,
-  area = "changes",
+  area: initialArea = "changes",
+  showCatalog = false,
 }: {
   connection: WarehouseConnectionRef;
   resource: PublishedResourceSelector;
   report: Pick<IncidentReadReport, "from" | "until" | "recorded_before">;
   area?: PublishedArea;
+  showCatalog?: boolean;
 }) {
   const { window_page_rows: pageRows } = useReadDefaults();
+  const [filterArea, setFilterArea] = useState<PublishedArea>(initialArea);
   const [cursors, setCursors] = useState<(PublishedResourceCursor | null)[]>([
     null,
   ]);
@@ -72,7 +75,7 @@ export function PublishedWindow({
           window: { from: report.from, until: report.until },
           as_of: report.recorded_before,
           view:
-            area === "schema" && after === null
+            showCatalog && after === null
               ? "compatible-workload"
               : "published-answers",
           page_rows: pageRows,
@@ -88,11 +91,12 @@ export function PublishedWindow({
       report.recorded_before,
       after,
       pageRows,
+      showCatalog,
     ],
   );
   const result = useRead(
     load,
-    `published:${connection.name}:${resource.database}:${area}`,
+    `published:${connection.name}:${resource.database}:${showCatalog ? "hub" : initialArea}`,
   );
   const page = result.status === "ready" ? result.value : null;
 
@@ -100,6 +104,8 @@ export function PublishedWindow({
     let findings = 0;
     let high = 0;
     let changes = 0;
+    let schemaCount = 0;
+    let opsCount = 0;
     let checksEvaluated = 0;
     for (const analysis of page?.published ?? []) {
       checksEvaluated += Math.max(
@@ -108,9 +114,11 @@ export function PublishedWindow({
       );
       for (const f of analysis.findings) {
         const cat = f.finding.finding.category;
+        if (schemaFindings.has(cat)) schemaCount++;
+        if (operationalFindings.has(cat)) opsCount++;
         if (
-          area === "changes" ||
-          (area === "schema"
+          filterArea === "changes" ||
+          (filterArea === "schema"
             ? schemaFindings.has(cat)
             : operationalFindings.has(cat))
         ) {
@@ -120,9 +128,11 @@ export function PublishedWindow({
       }
       for (const c of analysis.changes) {
         const k = c.change.change.kind;
+        if (schemaChanges.has(k)) schemaCount++;
+        if (operationalChanges.has(k)) opsCount++;
         if (
-          area === "changes" ||
-          (area === "schema"
+          filterArea === "changes" ||
+          (filterArea === "schema"
             ? schemaChanges.has(k)
             : operationalChanges.has(k))
         ) {
@@ -130,8 +140,8 @@ export function PublishedWindow({
         }
       }
     }
-    return { findings, high, changes, checksEvaluated };
-  }, [page?.published, area]);
+    return { findings, high, changes, schemaCount, opsCount, checksEvaluated };
+  }, [page?.published, filterArea]);
 
   if (!page)
     return (
@@ -141,18 +151,18 @@ export function PublishedWindow({
     );
 
   const AreaIcon =
-    area === "schema"
+    filterArea === "schema"
       ? TableProperties
-      : area === "operations"
+      : filterArea === "operations"
         ? SlidersHorizontal
         : Layers3;
 
   const areaSubtitle =
-    area === "schema"
+    filterArea === "schema"
       ? "Missing & redundant indexes, table bloat, statistics freshness, and schema DDL changes."
-      : area === "operations"
+      : filterArea === "operations"
         ? "Engine settings posture, autovacuum/maintenance health, background jobs, and operational events."
-        : "All ranked diagnostic findings and recorded schema, configuration, and operational changes.";
+        : "Ranked index, posture, configuration, and maintenance advisors alongside recorded schema & setting changes.";
 
   const filteredNotes = [
     ...page.gaps.map((g) => humanizeGap(g.kind)),
@@ -163,7 +173,7 @@ export function PublishedWindow({
     ),
   ];
 
-  const schemaCatalog = page.telemetry?.schema;
+  const schemaCatalog = showCatalog ? page.telemetry?.schema : undefined;
 
   return (
     <div className="published-stack">
@@ -171,11 +181,11 @@ export function PublishedWindow({
         <div className={`metric ${stats.findings > 0 ? "metric-warn" : ""}`}>
           <span>
             <AreaIcon size={15} />
-            {area === "schema"
-              ? "Schema & index findings"
-              : area === "operations"
-                ? "Operational findings"
-                : "Total findings"}
+            {filterArea === "schema"
+              ? "Index & schema findings"
+              : filterArea === "operations"
+                ? "Posture & config findings"
+                : "Diagnostic findings"}
           </span>
           <strong>{stats.findings}</strong>
         </div>
@@ -189,12 +199,10 @@ export function PublishedWindow({
         <div className="metric">
           <span>
             <GitCommitHorizontal size={15} />
-            {area === "schema" && schemaCatalog
-              ? "Tables & indexes"
-              : "Recorded changes"}
+            {schemaCatalog ? "Tables & indexes" : "Recorded changes"}
           </span>
           <strong>
-            {area === "schema" && schemaCatalog
+            {schemaCatalog
               ? `${schemaCatalog.tables.length} / ${schemaCatalog.indexes.length}`
               : stats.changes}
           </strong>
@@ -204,30 +212,56 @@ export function PublishedWindow({
             <CheckCircle2 size={15} />
             Checks verified
           </span>
-          <strong>{stats.checksEvaluated || (page.published.length ? 18 : 0)}</strong>
+          <strong>
+            {stats.checksEvaluated || (page.published.length ? 18 : 0)}
+          </strong>
         </div>
       </section>
 
-      {area === "schema" && schemaCatalog && (
-        <SchemaExplorer catalog={schemaCatalog} />
-      )}
+      {schemaCatalog && <SchemaExplorer catalog={schemaCatalog} />}
 
       <section className="panel published-panel">
-        <header className="panel-head">
+        <header className="panel-head fleet-panel-head">
           <div className="panel-head-copy">
             <h2 className="icon-heading">
               <AreaIcon size={18} />
-              {area === "changes"
-                ? w.published
-                : area === "schema"
-                  ? w.schema
-                  : w.operations}
+              {w.published}
             </h2>
             <small>{areaSubtitle}</small>
           </div>
-          <span className="case-meta-pill">
-            {stamp(report.from)} – {stamp(report.until)}
-          </span>
+
+          <div className="fleet-controls">
+            <div
+              className="switcher"
+              role="group"
+              aria-label="Filter advisors and changes"
+            >
+              <button
+                type="button"
+                aria-pressed={filterArea === "changes"}
+                onClick={() => setFilterArea("changes")}
+              >
+                All
+              </button>
+              <button
+                type="button"
+                aria-pressed={filterArea === "schema"}
+                onClick={() => setFilterArea("schema")}
+              >
+                Indexes &amp; DDL ({stats.schemaCount})
+              </button>
+              <button
+                type="button"
+                aria-pressed={filterArea === "operations"}
+                onClick={() => setFilterArea("operations")}
+              >
+                Operations &amp; config ({stats.opsCount})
+              </button>
+            </div>
+            <span className="case-meta-pill">
+              {stamp(report.from)} – {stamp(report.until)}
+            </span>
+          </div>
         </header>
 
         <div className="published-body">
@@ -240,7 +274,7 @@ export function PublishedWindow({
             <PublishedAnalysis
               key={analysis.context.capture.manifest_sha256}
               analysis={analysis}
-              area={area}
+              area={filterArea}
               scope={{ resource, connection }}
             />
           ))}

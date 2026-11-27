@@ -3,26 +3,22 @@ import type { PublishedResourceSelector, WarehouseConnectionRef } from "./api";
 
 export type Section =
   | "incident"
-  | "timeline"
   | "resources"
   | "workload"
-  | "operations"
   | "schema"
-  | "changes"
-  | "coverage";
+  | "timeline";
 
 const sections: Section[] = [
   "incident",
   "resources",
   "workload",
-  "timeline",
-  "operations",
   "schema",
-  "changes",
-  "coverage",
+  "timeline",
 ];
 
 function validSection(raw: string | null | undefined): Section {
+  if (raw === "operations" || raw === "changes") return "schema";
+  if (raw === "coverage") return "timeline";
   return sections.find((s) => s === raw) ?? "incident";
 }
 

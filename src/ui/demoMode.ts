@@ -412,6 +412,13 @@ export function getDemoPaletteResources(): PaletteResource[] {
       archive: { name: arch.name, revision: arch.revision },
       selector: row.selector,
       around: row.latest_observed_until ?? row.latest_collected_until,
+      freshness: row.freshness,
+      sharedGroup: row.shared_group,
+      activeIncidents: row.active_incidents,
+      cpuPct: row.telemetry?.cpu_pct ?? null,
+      memoryPct: row.telemetry?.memory_pct ?? null,
+      dominantWait: row.telemetry?.dominant_wait ?? null,
+      latestCollectedUntil: row.latest_collected_until,
     })),
   );
 }

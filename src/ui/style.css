@@ -2116,27 +2116,66 @@ figcaption {
   display: flex;
   overflow-x: auto;
   white-space: nowrap;
-  gap: 20px;
+  gap: 6px;
   border-bottom: 1px solid var(--line);
   margin: 0 0 18px;
+  padding-bottom: 0;
 }
 
 .tabs a {
-  padding: 11px 2px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 12px;
+  border-radius: 8px 8px 0 0;
   color: var(--subtle);
   text-decoration: none;
   font-size: 13.5px;
-  font-weight: 520;
+  font-weight: 540;
+  transition:
+    color 120ms ease,
+    background 120ms ease;
 }
 
 .tabs a:hover {
   color: var(--ink);
+  background: color-mix(in srgb, var(--muted) 55%, transparent);
 }
 
 .tabs a[aria-current="page"] {
   box-shadow: inset 0 -2.5px var(--accent);
   color: var(--ink);
-  font-weight: 650;
+  font-weight: 660;
+  background: color-mix(in srgb, var(--accent-soft) 42%, transparent);
+}
+
+.tab-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 19px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  background: var(--muted);
+  border: 1px solid var(--line);
+  color: var(--subtle);
+}
+
+.tabs a[aria-current="page"] .tab-badge {
+  background: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 32%, transparent);
+  color: var(--accent);
+}
+
+.tab-badge.tab-badge-danger,
+.tabs a[aria-current="page"] .tab-badge.tab-badge-danger {
+  background: var(--danger-bg);
+  border-color: color-mix(in srgb, var(--danger) 35%, transparent);
+  color: var(--danger);
 }
 
 select,
@@ -5730,5 +5769,655 @@ summary::-webkit-details-marker {
   }
   .schema-table-detail {
     padding-left: 16px;
+  }
+}
+
+/* =========================================================================
+   2:00 AM On-Call DRI Experience: Clock, Situation Banner, Attribution & Briefs
+   ========================================================================= */
+
+.clock-pill {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
+.clock-pill-code {
+  font-size: 11.5px;
+  font-weight: 660;
+}
+
+.clock-pill-local {
+  border-color: color-mix(in srgb, var(--accent) 55%, rgba(255, 255, 255, 0.2));
+  background: color-mix(in srgb, var(--accent) 22%, rgba(255, 255, 255, 0.05));
+}
+
+/* Database Header Compute Pool & Noisy Neighbor Pills */
+.pool-context-pill,
+.noisy-neighbor-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 580;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.pool-context-pill {
+  background: var(--muted);
+  border: 1px solid var(--line);
+  color: var(--subtle);
+}
+
+.pool-context-pill svg {
+  color: var(--accent);
+}
+
+.noisy-neighbor-pill {
+  background: var(--danger-bg);
+  border: 1px solid color-mix(in srgb, var(--danger) 38%, var(--line));
+  color: var(--danger);
+  font-weight: 640;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease,
+    transform 120ms ease;
+}
+
+.noisy-neighbor-pill:hover {
+  background: color-mix(in srgb, var(--danger) 20%, var(--panel));
+  border-color: var(--danger);
+}
+
+.head-rel-age {
+  color: var(--subtle);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Live 3-State Situation Banner */
+.situation-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px 20px;
+  flex-wrap: wrap;
+  padding: 13px 18px;
+  margin-bottom: 14px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  box-shadow: var(--shadow-sm);
+}
+
+.situation-ongoing {
+  border-color: color-mix(in srgb, var(--danger) 46%, var(--line));
+  border-left: 4px solid var(--danger);
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--danger) 9%, var(--panel)) 0%,
+    var(--panel) 55%
+  );
+}
+
+.situation-recovered {
+  border-color: color-mix(in srgb, var(--green) 40%, var(--line));
+  border-left: 4px solid var(--green);
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--green) 8%, var(--panel)) 0%,
+    var(--panel) 55%
+  );
+}
+
+.situation-stale {
+  border-color: color-mix(in srgb, var(--warn) 48%, var(--line));
+  border-left: 4px solid var(--warn);
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--warn) 10%, var(--panel)) 0%,
+    var(--panel) 60%
+  );
+}
+
+.situation-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  min-width: 0;
+  flex: 1;
+}
+
+.situation-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 740;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+  flex: none;
+}
+
+.pill-ongoing {
+  background: var(--danger-bg);
+  color: var(--danger);
+  border: 1px solid color-mix(in srgb, var(--danger) 35%, transparent);
+}
+
+.pill-recovered {
+  background: var(--soft);
+  color: var(--green);
+  border: 1px solid color-mix(in srgb, var(--green) 32%, transparent);
+}
+
+.pill-stale {
+  background: var(--warning-bg);
+  color: var(--warn);
+  border: 1px solid color-mix(in srgb, var(--warn) 36%, transparent);
+}
+
+.situation-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.situation-copy strong {
+  font-size: 13.5px;
+  font-weight: 660;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+
+.situation-copy span {
+  font-size: 12.5px;
+  color: var(--subtle);
+  line-height: 1.4;
+}
+
+.situation-kpis {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 5px 11px;
+  border-radius: 8px;
+  background: var(--muted);
+  border: 1px solid var(--line);
+  font-size: 12px;
+  color: var(--subtle);
+  font-variant-numeric: tabular-nums;
+  flex: none;
+}
+
+.situation-kpis b {
+  color: var(--ink);
+  margin-left: 2px;
+}
+
+/* Interactive MissionTimeline Pins */
+button.corr-incident-span,
+button.corr-event-diamond {
+  padding: 0;
+  cursor: pointer;
+  appearance: none;
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+
+button.corr-incident-span:hover {
+  box-shadow: 0 0 0 2px var(--danger-bg);
+}
+
+button.corr-event-diamond:hover {
+  transform: translate(-50%, -50%) rotate(45deg) scale(1.25);
+}
+
+/* Upgraded ObservationTimes Rail */
+.timeline-caption-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.timeline-span-pill {
+  font-size: 11px;
+  font-weight: 620;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  color: var(--subtle);
+  font-variant-numeric: tabular-nums;
+}
+
+.time-row {
+  grid-template-columns: 8.5rem minmax(40px, 1fr) auto;
+}
+
+.time-row-label {
+  color: var(--subtle);
+  font-weight: 540;
+}
+
+.time-row-stamps {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.rel-age-chip {
+  font-size: 11px;
+  font-weight: 620;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+/* IncidentCase Share Actions, Query Cards & Attribution Rail */
+.case-title {
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.case-rel-pill {
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+.case-share-actions {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+
+.case-action-chip {
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 580;
+  color: var(--ink);
+}
+
+.permalink-chip {
+  padding: 4px 9px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
+}
+
+.permalink-chip:hover {
+  background: var(--muted);
+  border-color: var(--line);
+}
+
+.query-culprit {
+  border-left: 3px solid var(--danger);
+}
+
+.query-affected {
+  border-left: 3px solid var(--warn);
+}
+
+.query-card-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+  padding-bottom: 7px;
+  border-bottom: 1px solid var(--line);
+}
+
+.query-role-tag {
+  font-size: 10.5px;
+  font-weight: 680;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--subtle);
+}
+
+.query-role-tag.role-culprit {
+  color: var(--danger);
+}
+
+.query-role-tag.role-affected {
+  color: var(--warn);
+}
+
+.query-inspect-btn {
+  padding: 3px 9px;
+  font-size: 11.5px;
+  font-weight: 620;
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--line));
+  background: var(--panel);
+}
+
+.query-inspect-btn:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+/* Right-Hand Blast Radius & Window Changes Rail */
+.case-intel-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.intel-rail-block {
+  display: grid;
+  gap: 9px;
+}
+
+.intel-rail-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.intel-rail-head h3 {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 12.5px;
+  font-weight: 660;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--subtle);
+}
+
+.intel-rail-head h3 svg {
+  color: var(--accent);
+}
+
+.rail-jump-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.rail-jump-link:hover {
+  text-decoration: underline;
+}
+
+.attribution-stack {
+  display: grid;
+  gap: 9px;
+}
+
+.attr-card {
+  padding: 11px 13px;
+  border-radius: 9px;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--muted) 52%, var(--panel));
+  display: grid;
+  gap: 5px;
+}
+
+.attr-culprit {
+  border-left: 3px solid var(--danger);
+  background: color-mix(in srgb, var(--danger) 5%, var(--panel));
+}
+
+.attr-card-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  font-weight: 720;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--danger);
+}
+
+.attr-card:not(.attr-culprit) .attr-card-eyebrow {
+  color: var(--subtle);
+}
+
+.attr-service-name {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 14px;
+  font-weight: 680;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.attr-meta-tags {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--subtle);
+}
+
+.attr-meta-tags code {
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  font-size: 11px;
+  color: var(--ink);
+}
+
+.attr-note {
+  margin: 0;
+  font-size: 12px;
+  color: var(--subtle);
+  line-height: 1.45;
+}
+
+.attr-victims-box {
+  padding: 10px 12px;
+  border-radius: 9px;
+  border: 1px solid var(--line);
+  background: var(--muted);
+  display: grid;
+  gap: 7px;
+}
+
+.attr-sub-label {
+  font-size: 10.5px;
+  font-weight: 660;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--subtle);
+}
+
+.attr-victim-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 6px;
+  border-top: 1px solid var(--line);
+  font-size: 12px;
+}
+
+.attr-victim-row strong {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+}
+
+.attr-victim-row small {
+  display: block;
+  margin-top: 1px;
+  font-size: 10.5px;
+}
+
+.attr-victim-stat {
+  font-size: 11.5px;
+  font-weight: 620;
+  font-variant-numeric: tabular-nums;
+  color: var(--warn);
+  white-space: nowrap;
+}
+
+.rail-changes-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 7px;
+}
+
+.rail-change-item {
+  padding: 9px 11px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--muted) 42%, var(--panel));
+  display: grid;
+  gap: 4px;
+}
+
+.rail-change-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.rail-change-top small {
+  margin: 0;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.rail-change-title {
+  font-size: 12px;
+  font-weight: 540;
+  color: var(--ink);
+  line-height: 1.4;
+}
+
+.rail-empty-note {
+  margin: 0;
+  font-size: 12px;
+}
+
+/* Compact Verified Archive Provenance Footer */
+.case-provenance-strip {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 10px;
+}
+
+.provenance-strip-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.provenance-strip-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  color: var(--subtle);
+}
+
+.provenance-strip-title svg {
+  color: var(--accent);
+}
+
+.provenance-strip-title strong {
+  color: var(--ink);
+  font-weight: 620;
+}
+
+.provenance-strip-title small {
+  margin: 0;
+  font-size: 11.5px;
+}
+
+.evidence-chip-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.case-provenance-strip .evidence-button {
+  width: auto;
+  flex: 1 1 220px;
+  max-width: 100%;
+  margin: 0;
+  padding: 7px 11px;
+  background: color-mix(in srgb, var(--muted) 45%, var(--panel));
+}
+
+.case-provenance-strip .evidence-button strong {
+  font-size: 12px;
+}
+
+.case-provenance-strip .evidence-button small {
+  margin-top: 1px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10.5px;
+}
+
+/* Unified Timeline & Coverage Stack + Blind Collector Tag */
+.timeline-coverage-stack {
+  display: grid;
+  gap: 18px;
+}
+
+.timeline-coverage-stack > .case,
+.timeline-coverage-stack > .corr-strip,
+.timeline-coverage-stack > .metrics {
+  margin-bottom: 0;
+}
+
+.blind-telemetry-tag {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 6px;
+  border: 1px dashed color-mix(in srgb, var(--danger) 45%, var(--line));
+  color: var(--danger);
+  background: var(--danger-bg);
+}
+
+@media (max-width: 740px) {
+  .time-row {
+    grid-template-columns: 1fr;
+    gap: 3px;
+  }
+  .time-row-stamps {
+    justify-content: flex-start;
+  }
+  .case-share-actions {
+    margin-left: 0;
+  }
+  .situation-kpis {
+    width: 100%;
+    justify-content: space-between;
   }
 }

@@ -18,6 +18,7 @@ import {
   useLocationHref,
 } from "./navigation";
 import { ThemePicker } from "./themes";
+import { ClockToggle, useClockZone } from "./clock";
 import { LivePulseToggle } from "./livePulse";
 import { McpButton } from "./McpModal";
 import { ErrorBoundary } from "./ErrorBoundary";
@@ -113,6 +114,7 @@ function DemoTourMenu() {
 
 function App() {
   useLocationHref();
+  useClockZone();
   const parsed = parseRoute();
   const investigating = parsed.kind === "investigate";
   const demo = isDemoMode();
@@ -160,6 +162,7 @@ function App() {
           <div className="top-controls">
             {demo && <DemoTourMenu />}
             {access && <LivePulseToggle />}
+            <ClockToggle />
             {access && session.status === "ready" && (
               <McpButton providers={session.value.providers} />
             )}

@@ -16,7 +16,7 @@ import { StateMessage, humanizeGap, stamp } from "./shared";
 import { Workload } from "./Workload";
 import w from "./en.json";
 
-function Coverage({
+export function Coverage({
   originals,
   range,
 }: {

@@ -22,6 +22,7 @@ const MAX_SAVED: i64 = 100;
 #[serde(rename_all = "lowercase")]
 pub enum View {
     Incident,
+    Resources,
     Workload,
     Changes,
     Coverage,

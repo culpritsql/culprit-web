@@ -96,7 +96,9 @@ for (const theme of ["light", "dark"] as const) {
         Date.parse(around),
       );
       await selected.click();
-      await page.getByRole("link", { name: "Collection coverage" }).click();
+      await page
+        .getByRole("link", { name: "Timeline & coverage", exact: true })
+        .click();
       await expect(page).toHaveURL(
         (url) =>
           url.searchParams.get("from") === target.searchParams.get("from") &&

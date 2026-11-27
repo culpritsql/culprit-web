@@ -14,6 +14,7 @@ import {
   Radio,
   RefreshCw,
   Search,
+  ServerCrash,
   X,
 } from "lucide-react";
 import type { WarehouseFleetReport } from "../../vendor/culprit/app/src/gen/WarehouseFleetReport";
@@ -23,7 +24,7 @@ import { EngineBadge } from "./EngineBadge";
 import { fleetRequest } from "./fleetRequest";
 import { useLiveTick } from "./livePulse";
 import { archiveUrl, investigationUrl, spaClick } from "./navigation";
-import { MicroMeter, stamp, waitTone } from "./shared";
+import { MicroMeter, relativeAge, stamp, waitTone } from "./shared";
 import w from "./en.json";
 
 const PAGE_SIZE = 12;
@@ -153,7 +154,13 @@ function ArchiveSummary({
   );
 }
 
-function buildTrendBuckets(horizon: Horizon, activeBase: number) {
+function buildTrendBuckets(
+  horizon: Horizon,
+  activeBase: number,
+  regressionsBase: number,
+  staleBase: number,
+  demo: boolean,
+) {
   const count = horizon === "24h" ? 24 : horizon === "7d" ? 14 : 30;
   const labels =
     horizon === "24h"
@@ -161,20 +168,48 @@ function buildTrendBuckets(horizon: Horizon, activeBase: number) {
       : horizon === "7d"
         ? ["7d ago", "5d ago", "3d ago", "Yesterday", "Today"]
         : ["30d ago", "22d ago", "15d ago", "7d ago", "Today"];
-  const mult = horizon === "24h" ? 1 : horizon === "7d" ? 2.4 : 4.2;
 
+  if (!demo) {
+    const bars = Array.from({ length: count }, (_, idx) => {
+      const isCurrent = idx === count - 1;
+      const locking = isCurrent ? activeBase : 0;
+      const regression = isCurrent ? regressionsBase : 0;
+      const replIo = isCurrent ? staleBase : 0;
+      return {
+        locking,
+        regression,
+        replIo,
+        total: locking + regression + replIo,
+      };
+    });
+    return {
+      bars,
+      labels,
+      totalIncidents: activeBase,
+      resolvedCount: 0,
+      mttr: "Live snapshot",
+    };
+  }
+
+  const mult = horizon === "24h" ? 1 : horizon === "7d" ? 2.4 : 4.2;
   const bars = Array.from({ length: count }, (_, idx) => {
     const t = idx / (count - 1);
     const wave =
       Math.max(0, Math.sin(idx * 1.15) * 2) +
       (t > 0.78 ? activeBase * 0.45 : 0) +
       (Math.abs(t - 0.36) < 0.08 ? 3 : 0);
-    const locking = Math.max(0, Math.round((wave * 0.5 + (idx % 3 === 0 ? 1 : 0)) * mult));
+    const locking = Math.max(
+      0,
+      Math.round((wave * 0.5 + (idx % 3 === 0 ? 1 : 0)) * mult),
+    );
     const regression = Math.max(
       0,
       Math.round(((idx % 4 === 1 ? 1.4 : 0.4) + (t > 0.85 ? 1 : 0)) * mult),
     );
-    const replIo = Math.max(0, Math.round((idx % 5 === 2 ? 1.2 : 0.3) * mult));
+    const replIo = Math.max(
+      0,
+      Math.round((idx % 5 === 2 ? 1.2 : 0.3) * mult),
+    );
     return {
       locking,
       regression,
@@ -185,7 +220,8 @@ function buildTrendBuckets(horizon: Horizon, activeBase: number) {
 
   const totalIncidents = bars.reduce((s, b) => s + b.total, 0);
   const resolvedCount = Math.max(0, totalIncidents - activeBase);
-  const mttr = horizon === "24h" ? "4m 18s" : horizon === "7d" ? "6m 40s" : "7m 12s";
+  const mttr =
+    horizon === "24h" ? "4m 18s" : horizon === "7d" ? "6m 40s" : "7m 12s";
 
   return { bars, labels, totalIncidents, resolvedCount, mttr };
 }
@@ -256,20 +292,74 @@ export function RegionalFleet({
     };
   }, [loadedList]);
 
+  const isShowcaseEstate =
+    isDemoMode() || connections.some((c) => c.name === "Demo estate");
+
   const trend = useMemo(
-    () => buildTrendBuckets(horizon, globalRollup.activeIncidents),
-    [horizon, globalRollup.activeIncidents],
+    () =>
+      buildTrendBuckets(
+        horizon,
+        globalRollup.activeIncidents,
+        globalRollup.regressions,
+        globalRollup.stale + globalRollup.unreachable,
+        isShowcaseEstate,
+      ),
+    [
+      horizon,
+      globalRollup.activeIncidents,
+      globalRollup.regressions,
+      globalRollup.stale,
+      globalRollup.unreachable,
+      isShowcaseEstate,
+    ],
   );
   const maxTrendBar = Math.max(1, ...trend.bars.map((b) => b.total));
 
   const triageRows = useMemo(() => {
-    const all: Array<{
-      connection: WarehouseConnectionRef;
-      region: string;
-      row: WarehouseFleetRow;
-      headline: string;
-    }> = [];
+    type TriageItem =
+      | {
+          kind: "collector";
+          key: string;
+          connection: WarehouseConnectionRef;
+          region: string;
+          targetName: string;
+          engine: WarehouseFleetRow["engine"];
+          headline: string;
+          finishedAt: string;
+          href: string;
+          priority: number;
+        }
+      | {
+          kind: "database";
+          key: string;
+          connection: WarehouseConnectionRef;
+          region: string;
+          row: WarehouseFleetRow;
+          headline: string;
+          href: string;
+          priority: number;
+        };
+
+    const all: TriageItem[] = [];
     for (const item of loadedList) {
+      const regionName = item.region || "Global";
+      for (const ct of item.report.collector_targets ?? []) {
+        all.push({
+          kind: "collector",
+          key: `${item.connection.name}:collector:${ct.connection_id}`,
+          connection: item.connection,
+          region: regionName,
+          targetName: ct.connection_name,
+          engine: ct.engine,
+          headline:
+            ct.original_stop ??
+            ct.original_status ??
+            "Collector connection failed before publishing",
+          finishedAt: ct.finished_at,
+          href: archiveUrl(item.connection.name),
+          priority: 1000,
+        });
+      }
       for (const row of item.report.rows) {
         const needsAttention =
           row.active_incidents > 0 ||
@@ -290,15 +380,26 @@ export function RegionalFleet({
                   : (row.telemetry?.cpu_pct ?? 0) >= 85
                     ? `Compute saturation: CPU ${row.telemetry?.cpu_pct}% / Memory ${row.telemetry?.memory_pct}%`
                     : row.freshness === "stale"
-                      ? "Collection stale — last capture > 2h ago"
+                      ? `Collection stale — last capture ${relativeAge(row.latest_collected_until, asOf) || "> 2h ago"}`
                       : row.high_findings > 0
                         ? `${row.high_findings} high-severity schema/posture finding${row.high_findings > 1 ? "s" : ""}`
                         : "Healthy baseline";
         all.push({
+          kind: "database",
+          key: item.connection.name + ":" + row.resource_id,
           connection: item.connection,
-          region: item.region || "Global",
+          region: regionName,
           row,
           headline,
+          href: investigationUrl(
+            item.connection,
+            row.selector,
+            row.latest_observed_until ?? row.latest_collected_until,
+          ),
+          priority:
+            row.active_incidents * 100 +
+            row.high_findings * 10 +
+            ((row.telemetry?.cpu_pct ?? 0) >= 85 ? 25 : 0),
         });
       }
     }
@@ -307,21 +408,22 @@ export function RegionalFleet({
       .filter((entry) => {
         if (regionFilter && entry.region !== regionFilter) return false;
         if (!q) return true;
+        const name =
+          entry.kind === "collector"
+            ? entry.targetName
+            : entry.row.database_name;
+        const eng =
+          entry.kind === "collector" ? entry.engine : entry.row.engine;
         return (
-          entry.row.database_name.toLowerCase().includes(q) ||
+          name.toLowerCase().includes(q) ||
           entry.connection.name.toLowerCase().includes(q) ||
           entry.region.toLowerCase().includes(q) ||
           entry.headline.toLowerCase().includes(q) ||
-          entry.row.engine.toLowerCase().includes(q)
+          eng.toLowerCase().includes(q)
         );
       })
-      .sort(
-        (a, b) =>
-          b.row.active_incidents - a.row.active_incidents ||
-          b.row.high_findings - a.row.high_findings ||
-          (b.row.telemetry?.cpu_pct ?? 0) - (a.row.telemetry?.cpu_pct ?? 0),
-      );
-  }, [loadedList, triageMode, triageQuery, regionFilter]);
+      .sort((a, b) => b.priority - a.priority);
+  }, [loadedList, triageMode, triageQuery, regionFilter, asOf]);
 
   const uniqueRegions = useMemo(
     () => [
@@ -345,15 +447,48 @@ export function RegionalFleet({
   const start = page * PAGE_SIZE;
 
   const causeBreakdown = useMemo(() => {
+    if (!isShowcaseEstate) {
+      return [
+        {
+          label: "Active database incidents",
+          count: globalRollup.activeIncidents,
+          cls: "seg-lock",
+        },
+        {
+          label: "Plan regressions & scans",
+          count: globalRollup.regressions,
+          cls: "seg-cpu",
+        },
+        {
+          label: "High-severity posture findings",
+          count: globalRollup.highFindings,
+          cls: "seg-memory",
+        },
+        {
+          label: "Stale collection coverage",
+          count: globalRollup.stale,
+          cls: "seg-io",
+        },
+        {
+          label: "Collector / TLS connectivity",
+          count: globalRollup.unreachable,
+          cls: "seg-other",
+        },
+      ];
+    }
     const mult = horizon === "24h" ? 1 : horizon === "7d" ? 4 : 14;
     return [
       { label: "Locking & deadlocks", count: 4 * mult, cls: "seg-lock" },
       { label: "Plan regressions & scans", count: 3 * mult, cls: "seg-cpu" },
       { label: "Replica WAL / I/O lag", count: 2 * mult, cls: "seg-io" },
       { label: "CPU & memory saturation", count: 2 * mult, cls: "seg-memory" },
-      { label: "Collector / TLS connectivity", count: 1 * mult, cls: "seg-other" },
+      {
+        label: "Collector / TLS connectivity",
+        count: 1 * mult,
+        cls: "seg-other",
+      },
     ];
-  }, [horizon]);
+  }, [horizon, isShowcaseEstate, globalRollup]);
   const maxCause = Math.max(1, ...causeBreakdown.map((c) => c.count));
 
   return (
@@ -585,115 +720,167 @@ export function RegionalFleet({
             </header>
             {triageRows.length > 0 ? (
               <div className="triage-feed" role="list">
-                {triageRows
-                  .slice(0, 10)
-                  .map(({ connection, region, row, headline }) => {
-                    const href = investigationUrl(
-                      connection,
-                      row.selector,
-                      row.latest_observed_until ?? row.latest_collected_until,
-                    );
-                    const isIncident = row.active_incidents > 0;
-                    const isStale = row.freshness === "stale";
-                    const severityTone = isIncident
-                      ? "critical"
-                      : isStale
-                        ? "stale"
-                        : "warning";
-
+                {triageRows.slice(0, 10).map((entry) => {
+                  if (entry.kind === "collector") {
                     return (
                       <a
-                        key={connection.name + ":" + row.resource_id}
+                        key={entry.key}
                         role="listitem"
-                        className={`triage-row triage-${severityTone}`}
-                        href={href}
+                        className="triage-row triage-critical triage-collector-blind"
+                        href={entry.href}
                         onClick={spaClick}
                       >
                         <div className="triage-target">
                           <div className="triage-target-top">
                             <strong className="triage-db-name">
-                              {row.database_name}
+                              {entry.targetName}
                             </strong>
-                            <EngineBadge engine={row.engine} />
+                            <EngineBadge engine={entry.engine} />
                           </div>
                           <div className="triage-target-meta">
-                            <span>{region}</span>
+                            <span>{entry.region}</span>
                             <i aria-hidden="true">·</i>
-                            <span>{connection.name}</span>
-                            {row.environment && (
-                              <>
-                                <i aria-hidden="true">·</i>
-                                <span>{row.environment}</span>
-                              </>
-                            )}
+                            <span>{entry.connection.name}</span>
+                            <i aria-hidden="true">·</i>
+                            <span>
+                              failed {relativeAge(entry.finishedAt, asOf)}
+                            </span>
                           </div>
                         </div>
 
                         <div className="triage-diagnosis">
-                          <p className="triage-headline">{headline}</p>
+                          <p className="triage-headline">{entry.headline}</p>
                           <div className="triage-pills">
-                            {isIncident ? (
-                              <span className="status danger">
-                                <i />
-                                {row.active_incidents} active{" "}
-                                {row.active_incidents === 1
-                                  ? "incident"
-                                  : "incidents"}
-                              </span>
-                            ) : row.freshness !== "observed" ? (
-                              <span className="status stale">
-                                <i />
-                                {row.freshness} coverage
-                              </span>
-                            ) : (
-                              <span className="status partial">
-                                <i />
-                                {row.high_findings} high{" "}
-                                {row.high_findings === 1
-                                  ? "finding"
-                                  : "findings"}
-                              </span>
-                            )}
-                            {row.telemetry?.dominant_wait && !isStale && (
-                              <span
-                                className={`wait-pill wait-${waitTone(row.telemetry.dominant_wait)}`}
-                              >
-                                Wait: {row.telemetry.dominant_wait}
-                              </span>
-                            )}
-                            {row.recent_regressions > 0 && (
-                              <span className="triage-sub-pill">
-                                {row.recent_regressions} plan{" "}
-                                {row.recent_regressions === 1 ? "flip" : "flips"}
-                              </span>
-                            )}
+                            <span className="status danger">
+                              <ServerCrash size={11} />
+                              collector unreachable · blind target
+                            </span>
                           </div>
                         </div>
 
-                        <div
-                          className={`triage-telemetry ${isStale ? "is-stale" : ""}`}
-                        >
-                          <div className="util-pair">
-                            <MicroMeter
-                              label="CPU"
-                              value={row.telemetry?.cpu_pct}
-                            />
-                            <MicroMeter
-                              label="MEM"
-                              value={row.telemetry?.memory_pct}
-                            />
-                          </div>
+                        <div className="triage-telemetry is-stale">
+                          <span className="blind-telemetry-tag">
+                            No live telemetry
+                          </span>
                         </div>
 
                         <div className="triage-action">
                           <span className="triage-cta">
-                            <span>Investigate</span>
+                            <span>Inspect target</span>
                             <ArrowRight size={13} />
                           </span>
                         </div>
                       </a>
                     );
-                  })}
+                  }
+
+                  const { connection, region, row, headline, href } = entry;
+                  const isIncident = row.active_incidents > 0;
+                  const isStale = row.freshness === "stale";
+                  const severityTone = isIncident
+                    ? "critical"
+                    : isStale
+                      ? "stale"
+                      : "warning";
+                  const age = relativeAge(row.latest_collected_until, asOf);
+
+                  return (
+                    <a
+                      key={entry.key}
+                      role="listitem"
+                      className={`triage-row triage-${severityTone}`}
+                      href={href}
+                      onClick={spaClick}
+                    >
+                      <div className="triage-target">
+                        <div className="triage-target-top">
+                          <strong className="triage-db-name">
+                            {row.database_name}
+                          </strong>
+                          <EngineBadge engine={row.engine} />
+                        </div>
+                        <div className="triage-target-meta">
+                          <span>{region}</span>
+                          <i aria-hidden="true">·</i>
+                          <span>{connection.name}</span>
+                          {row.environment && (
+                            <>
+                              <i aria-hidden="true">·</i>
+                              <span>{row.environment}</span>
+                            </>
+                          )}
+                          {age && (
+                            <>
+                              <i aria-hidden="true">·</i>
+                              <span>{age}</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="triage-diagnosis">
+                        <p className="triage-headline">{headline}</p>
+                        <div className="triage-pills">
+                          {isIncident ? (
+                            <span className="status danger">
+                              <i />
+                              {row.active_incidents} active{" "}
+                              {row.active_incidents === 1
+                                ? "incident"
+                                : "incidents"}
+                            </span>
+                          ) : row.freshness !== "observed" ? (
+                            <span className="status stale">
+                              <i />
+                              {row.freshness} coverage
+                            </span>
+                          ) : (
+                            <span className="status partial">
+                              <i />
+                              {row.high_findings} high{" "}
+                              {row.high_findings === 1 ? "finding" : "findings"}
+                            </span>
+                          )}
+                          {row.telemetry?.dominant_wait && !isStale && (
+                            <span
+                              className={`wait-pill wait-${waitTone(row.telemetry.dominant_wait)}`}
+                            >
+                              Wait: {row.telemetry.dominant_wait}
+                            </span>
+                          )}
+                          {row.recent_regressions > 0 && (
+                            <span className="triage-sub-pill">
+                              {row.recent_regressions} plan{" "}
+                              {row.recent_regressions === 1 ? "flip" : "flips"}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div
+                        className={`triage-telemetry ${isStale ? "is-stale" : ""}`}
+                      >
+                        <div className="util-pair">
+                          <MicroMeter
+                            label="CPU"
+                            value={row.telemetry?.cpu_pct}
+                          />
+                          <MicroMeter
+                            label="MEM"
+                            value={row.telemetry?.memory_pct}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="triage-action">
+                        <span className="triage-cta">
+                          <span>Investigate</span>
+                          <ArrowRight size={13} />
+                        </span>
+                      </div>
+                    </a>
+                  );
+                })}
               </div>
             ) : (
               <p className="notice">
