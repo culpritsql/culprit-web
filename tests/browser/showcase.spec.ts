@@ -67,9 +67,6 @@ for (const theme of ["light", "dark"] as const) {
       await expect(
         drawer.getByRole("heading", { name: "Runtime by plan" }),
       ).toBeVisible();
-      await drawer
-        .getByRole("button", { name: "Captured execution plan" })
-        .click();
       await expect(drawer.locator(".drawer-plan-stage svg").first()).toBeVisible();
       await drawer
         .getByRole("button", { name: "Close statement inspector" })

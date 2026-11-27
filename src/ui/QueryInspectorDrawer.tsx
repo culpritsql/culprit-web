@@ -14,8 +14,9 @@ import {
   Copy,
   Database,
   GitCompareArrows,
-  Layers,
   ListTree,
+  Maximize2,
+  Minimize2,
   Network,
   TableProperties,
   X,
@@ -51,7 +52,7 @@ const LazyPlanDiffViewer = lazy(async () => {
   return { default: mod.PlanDiffViewer };
 });
 
-type DrawerTab = "overview" | "plan" | "diff";
+type PlanMode = "single" | "diff";
 
 const PLAN_LOOKS: Array<{
   look: PlanLook;
@@ -135,8 +136,9 @@ export function QueryInspectorDrawer({
 }) {
   const { colorMode } = useTheme();
   const query = queries[selectedIndex] ?? queries[0];
-  const [tab, setTab] = useState<DrawerTab>("overview");
+  const [planMode, setPlanMode] = useState<PlanMode>("single");
   const [planLook, setPlanLook] = useState<PlanLook>("diagram");
+  const [sqlExpanded, setSqlExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
   const bodyRef = useRef<HTMLDivElement>(null);
 
@@ -162,13 +164,10 @@ export function QueryInspectorDrawer({
   }, []);
 
   useEffect(() => {
-    setTab("overview");
-  }, [query?.id]);
-
-  // Reset internal drawer scroll to top whenever tab or inspected query changes
-  useEffect(() => {
+    setPlanMode("single");
+    setSqlExpanded(false);
     bodyRef.current?.scrollTo({ top: 0 });
-  }, [query?.id, tab, planLook]);
+  }, [query?.id]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -206,7 +205,9 @@ export function QueryInspectorDrawer({
       ? query.text.replace(/\s+/g, " ").trim()
       : `Query ${query.id}`;
 
-  const isFlushCanvas = tab === "plan" || tab === "diff";
+  const isLongSql =
+    (query.text?.length ?? 0) > 220 ||
+    (query.text?.split("\n").length ?? 0) > 5;
 
   return createPortal(
     <div
@@ -314,227 +315,243 @@ export function QueryInspectorDrawer({
           </div>
         </section>
 
-        <nav className="drawer-tabs" aria-label="Inspector sections">
-          <div className="drawer-tabs-primary">
-            <button
-              type="button"
-              data-active={tab === "overview"}
-              onClick={() => setTab("overview")}
-            >
-              <Layers size={14} />
-              SQL, Waits &amp; Variants
-            </button>
-            {hasPlan && (
-              <button
-                type="button"
-                data-active={tab === "plan"}
-                onClick={() => setTab("plan")}
-              >
-                <Network size={14} />
-                {w.executionPlan}
-              </button>
-            )}
-            {canCompare && (
-              <button
-                type="button"
-                data-active={tab === "diff"}
-                onClick={() => setTab("diff")}
-              >
-                <GitCompareArrows size={14} />
-                {w.comparePlans}
-              </button>
-            )}
-          </div>
-
-          {tab === "plan" && hasPlan && (
-            <div
-              className="drawer-plan-looks"
-              role="group"
-              aria-label="Execution plan view mode"
-            >
-              {PLAN_LOOKS.map((item) => {
-                const Icon = item.icon;
-                return (
+        <div ref={bodyRef} className="query-drawer-body query-drawer-unified">
+          <section className="drawer-band-sql">
+            <div className="drawer-band-head">
+              <span className="drawer-eyebrow">SQL statement</span>
+              <div className="drawer-sql-actions">
+                {isLongSql && (
                   <button
-                    key={item.look}
                     type="button"
-                    data-active={planLook === item.look}
-                    onClick={() => setPlanLook(item.look)}
+                    className="chip"
+                    onClick={() => setSqlExpanded((v) => !v)}
                   >
-                    <Icon size={12} />
-                    {item.label}
+                    {sqlExpanded ? (
+                      <>
+                        <Minimize2 size={11} /> Collapse
+                      </>
+                    ) : (
+                      <>
+                        <Maximize2 size={11} /> Expand SQL
+                      </>
+                    )}
                   </button>
-                );
-              })}
-            </div>
-          )}
-        </nav>
-
-        <div
-          ref={bodyRef}
-          className={`query-drawer-body ${isFlushCanvas ? "query-drawer-body-flush" : ""}`}
-        >
-          {tab === "overview" && (
-            <div className="drawer-overview-stack">
-              <section className="drawer-sql-card">
-                <div className="drawer-card-head">
-                  <h3>SQL statement</h3>
-                  <div className="drawer-sql-actions">
-                    {canCompare && (
-                      <button
-                        type="button"
-                        className="button button-accent"
-                        onClick={() => setTab("diff")}
-                      >
-                        <GitCompareArrows size={14} />
-                        {w.comparePlans}
-                      </button>
-                    )}
-                    {query.text && (
-                      <button
-                        type="button"
-                        className="chip"
-                        onClick={() => {
-                          navigator.clipboard?.writeText(query.text!);
-                          setCopied(true);
-                          setTimeout(() => setCopied(false), 1800);
-                        }}
-                      >
-                        {copied ? <Check size={12} /> : <Copy size={12} />}
-                        {copied ? "Copied" : "Copy SQL"}
-                      </button>
-                    )}
-                  </div>
-                </div>
-                <div className="drawer-sql-code">
-                  {query.text ? (
-                    <Suspense fallback={<pre>{query.text}</pre>}>
-                      <LazySql text={query.text} pretty />
-                    </Suspense>
-                  ) : (
-                    <pre>{w.noPayload}</pre>
-                  )}
-                </div>
-              </section>
-
-              <div className="drawer-split-grid">
-                <section className="drawer-subpanel">
-                  <h3>{w.recordedWaits}</h3>
-                  {sortedWaits.length > 0 ? (
-                    <div className="drawer-waits-list">
-                      {sortedWaits.map((wait, idx) => (
-                        <div key={idx} className="drawer-wait-row">
-                          <div className="drawer-wait-top">
-                            <span>
-                              <span
-                                className={`wait-pill wait-${waitTone(wait.category)}`}
-                              >
-                                {wait.category}
-                              </span>
-                              {wait.wait_type && (
-                                <code className="wait-native-code">
-                                  {wait.wait_type}
-                                </code>
-                              )}
-                            </span>
-                            <strong>{quantity(wait.wait_ms)} ms</strong>
-                          </div>
-                          <div className="track">
-                            <i
-                              className={`seg-${waitTone(wait.category)}`}
-                              style={{
-                                width: `${Math.max(4, (100 * wait.wait_ms) / maxWait)}%`,
-                              }}
-                            />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <small className="muted">{w.noRecordedWaits}</small>
-                  )}
-                </section>
-
-                <section className="drawer-subpanel">
-                  <h3>
-                    {query.plan_history?.kind === "cache"
-                      ? w.cachedPlans
-                      : w.planMeasurements}
-                  </h3>
-                  {query.plan_history && (
-                    <p className="muted drawer-plan-note">
-                      {query.plan_history.source.text}{" "}
-                      {query.plan_history.note.text}
-                    </p>
-                  )}
-                  {query.plans.length > 0 ? (
-                    <div className="table-scroll">
-                      <table>
-                        <thead>
-                          <tr>
-                            <th>{w.planId}</th>
-                            <th className="num-col">{w.calls}</th>
-                            <th className="num-col">{w.meanTime}</th>
-                            <th className="num-col">{w.logicalReads}</th>
-                            <th>{w.last}</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {query.plans.map((p) => (
-                            <tr key={p.id}>
-                              <td>
-                                <code>{p.id}</code>
-                              </td>
-                              <td className="num-col">
-                                {quantity(p.executions)}
-                              </td>
-                              <td className="num-col">
-                                {quantity(p.mean_time_ms)}
-                              </td>
-                              <td className="num-col">
-                                {quantity(p.logical_reads)}
-                              </td>
-                              <td>{p.last_seen ? stamp(p.last_seen) : "—"}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  ) : (
-                    <small className="muted">
-                      Single plan variant observed in this interval.
-                    </small>
-                  )}
-                </section>
+                )}
+                {query.text && (
+                  <button
+                    type="button"
+                    className="chip"
+                    onClick={() => {
+                      navigator.clipboard?.writeText(query.text!);
+                      setCopied(true);
+                      setTimeout(() => setCopied(false), 1800);
+                    }}
+                  >
+                    {copied ? <Check size={12} /> : <Copy size={12} />}
+                    {copied ? "Copied" : "Copy SQL"}
+                  </button>
+                )}
               </div>
             </div>
-          )}
-
-          {tab === "plan" && query.plan && (
-            <div className="drawer-plan-stage">
-              <Suspense
-                fallback={
-                  <p className="muted drawer-status-msg" role="status">
-                    {w.loading}
-                  </p>
-                }
-              >
-                <LazyPlanViewer
-                  plan={query.plan}
-                  query={query}
-                  look={planLook}
-                  showToolbar={false}
-                  showStatement={false}
-                  theme={colorMode}
-                />
-              </Suspense>
+            <div
+              className={`drawer-sql-flat ${sqlExpanded ? "is-expanded" : ""}`}
+            >
+              {query.text ? (
+                <Suspense fallback={<pre>{query.text}</pre>}>
+                  <LazySql text={query.text} pretty />
+                </Suspense>
+              ) : (
+                <pre>{w.noPayload}</pre>
+              )}
             </div>
-          )}
+          </section>
 
-          {tab === "diff" && canCompare && (
-            <div className="drawer-plan-stage">
-              <InlinePlanDiff query={query} colorMode={colorMode} />
+          <section className="drawer-band-telemetry">
+            <div className="drawer-band-pane">
+              <h3>{w.recordedWaits}</h3>
+              {sortedWaits.length > 0 ? (
+                <div className="drawer-waits-list">
+                  {sortedWaits.map((wait, idx) => (
+                    <div key={idx} className="drawer-wait-row">
+                      <div className="drawer-wait-top">
+                        <span>
+                          <span
+                            className={`wait-pill wait-${waitTone(wait.category)}`}
+                          >
+                            {wait.category}
+                          </span>
+                          {wait.wait_type && (
+                            <code className="wait-native-code">
+                              {wait.wait_type}
+                            </code>
+                          )}
+                        </span>
+                        <strong>{quantity(wait.wait_ms)} ms</strong>
+                      </div>
+                      <div className="track">
+                        <i
+                          className={`seg-${waitTone(wait.category)}`}
+                          style={{
+                            width: `${Math.max(4, (100 * wait.wait_ms) / maxWait)}%`,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <small className="muted">{w.noRecordedWaits}</small>
+              )}
             </div>
+
+            <div className="drawer-band-pane">
+              <div className="drawer-pane-head">
+                <h3>
+                  {query.plan_history?.kind === "cache"
+                    ? w.cachedPlans
+                    : w.planMeasurements}
+                </h3>
+                {canCompare && (
+                  <button
+                    type="button"
+                    className={`chip ${planMode === "diff" ? "chip-active" : ""}`}
+                    onClick={() =>
+                      setPlanMode((m) => (m === "diff" ? "single" : "diff"))
+                    }
+                  >
+                    <GitCompareArrows size={12} />
+                    {planMode === "diff" ? "Show active plan" : w.comparePlans}
+                  </button>
+                )}
+              </div>
+              {query.plan_history && (
+                <p className="muted drawer-plan-note">
+                  {query.plan_history.source.text}{" "}
+                  {query.plan_history.note.text}
+                </p>
+              )}
+              {query.plans.length > 0 ? (
+                <div className="table-scroll">
+                  <table className="drawer-variants-table">
+                    <thead>
+                      <tr>
+                        <th>{w.planId}</th>
+                        <th className="num-col">{w.calls}</th>
+                        <th className="num-col">{w.meanTime}</th>
+                        <th className="num-col">{w.logicalReads}</th>
+                        <th>{w.last}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {query.plans.map((p) => (
+                        <tr key={p.id}>
+                          <td>
+                            <code>{p.id}</code>
+                          </td>
+                          <td className="num-col">{quantity(p.executions)}</td>
+                          <td className="num-col">{quantity(p.mean_time_ms)}</td>
+                          <td className="num-col">
+                            {quantity(p.logical_reads)}
+                          </td>
+                          <td>{p.last_seen ? stamp(p.last_seen) : "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <small className="muted">
+                  Single plan variant observed in this interval.
+                </small>
+              )}
+            </div>
+          </section>
+
+          {hasPlan && (
+            <section className="drawer-band-plan">
+              <div className="drawer-plan-bar">
+                <div className="drawer-plan-bar-title">
+                  <Network size={14} />
+                  <h3>
+                    {planMode === "diff" ? w.comparePlans : w.executionPlan}
+                  </h3>
+                </div>
+
+                <div className="drawer-plan-bar-controls">
+                  {canCompare && (
+                    <div
+                      className="drawer-plan-looks"
+                      role="group"
+                      aria-label="Plan comparison mode"
+                    >
+                      <button
+                        type="button"
+                        data-active={planMode === "single"}
+                        onClick={() => setPlanMode("single")}
+                      >
+                        Active plan
+                      </button>
+                      <button
+                        type="button"
+                        data-active={planMode === "diff"}
+                        onClick={() => setPlanMode("diff")}
+                      >
+                        <GitCompareArrows size={12} />
+                        {w.comparePlans}
+                      </button>
+                    </div>
+                  )}
+
+                  {planMode === "single" && (
+                    <div
+                      className="drawer-plan-looks"
+                      role="group"
+                      aria-label="Execution plan view mode"
+                    >
+                      {PLAN_LOOKS.map((item) => {
+                        const Icon = item.icon;
+                        return (
+                          <button
+                            key={item.look}
+                            type="button"
+                            data-active={planLook === item.look}
+                            onClick={() => setPlanLook(item.look)}
+                          >
+                            <Icon size={12} />
+                            {item.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="drawer-plan-stage">
+                {planMode === "diff" && canCompare ? (
+                  <InlinePlanDiff query={query} colorMode={colorMode} />
+                ) : (
+                  query.plan && (
+                    <Suspense
+                      fallback={
+                        <p className="muted drawer-status-msg" role="status">
+                          {w.loading}
+                        </p>
+                      }
+                    >
+                      <LazyPlanViewer
+                        plan={query.plan}
+                        query={query}
+                        look={planLook}
+                        showToolbar={false}
+                        showStatement={false}
+                        theme={colorMode}
+                      />
+                    </Suspense>
+                  )
+                )}
+              </div>
+            </section>
           )}
         </div>
       </aside>

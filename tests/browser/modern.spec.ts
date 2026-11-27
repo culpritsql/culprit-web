@@ -138,12 +138,16 @@ test("multi-theme switcher, clean routing, scroll stability, telemetry, schema/o
   });
   await expect(drawer).toBeVisible();
   expect(await page.evaluate(() => document.body.style.overflow)).toBe("hidden");
-  await drawer.getByRole("button", { name: "Captured execution plan" }).click();
+  await expect(drawer.locator(".drawer-tabs")).toHaveCount(0);
+  await expect(
+    drawer.getByRole("heading", { name: "Recorded waits" }),
+  ).toBeVisible();
   await expect(drawer.locator(".pv-toolbar")).toHaveCount(0);
   await expect(drawer.locator(".plans-sql")).toHaveCount(0);
   await expect(
     drawer.getByRole("group", { name: "Execution plan view mode" }),
   ).toBeVisible();
+  await expect(drawer.locator(".drawer-plan-stage svg").first()).toBeVisible();
   await drawer.getByRole("button", { name: "Compare plans" }).first().click();
   await expect(drawer.getByText(/higher estimated cost/i)).toBeVisible();
   await drawer.getByRole("button", { name: "Close statement inspector" }).click();
@@ -197,7 +201,6 @@ test("multi-theme switcher, clean routing, scroll stability, telemetry, schema/o
     .click();
   const pgDrawer = page.getByRole("dialog", { name: "Statement inspector" });
   await expect(pgDrawer).toBeVisible();
-  await pgDrawer.getByRole("button", { name: "Captured execution plan" }).click();
   await expect(pgDrawer.locator(".drawer-plan-stage svg").first()).toBeVisible();
   await pgDrawer.getByRole("button", { name: "Close statement inspector" }).click();
 
