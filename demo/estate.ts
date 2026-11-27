@@ -85,6 +85,7 @@ function incidentScenario(): WarehouseIncidentView {
     recorded_at: before(70),
     lifecycle: "resolved",
   });
+  report.history.entries = [structuredClone(episode.entry)];
   episode.display.database_name = "Checkout";
   episode.display.environment = "Production";
   episode.victim_summary =

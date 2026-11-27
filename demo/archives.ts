@@ -97,6 +97,46 @@ export function sampleWindow(
     report.published = [];
     return report;
   }
+  const from = Date.parse(request.window.from);
+  const until = Date.parse(request.window.until);
+  const published = Date.parse(request.as_of);
+  const observedIncident = (
+    entry: (typeof view.report.history.entries)[number],
+  ) =>
+    Date.parse(entry.recorded_at) <= published &&
+    Date.parse(entry.first_seen_at) < until &&
+    Date.parse(entry.last_seen_at) >= from;
+  report.incidents.incidents = report.incidents.incidents.filter((item) =>
+    observedIncident(item.entry),
+  );
+  report.incidents.history.entries =
+    report.incidents.history.entries.filter(observedIncident);
+  if (published < Date.parse(around)) {
+    report.published = [];
+    return report;
+  }
+  const fullReport =
+    from <= Date.parse(workload.window_start!) && until >= Date.parse(around);
+  const hasReportTime =
+    from < Date.parse(around) && until >= Date.parse(around);
+  if (!hasReportTime) report.published = [];
+  if (report.incidents.incidents.length) {
+    const episode = report.incidents.incidents[0];
+    report.originals = episode.affected_queries[0].evidence.map((ref) => ({
+      original: {
+        capture: ref.capture,
+        manifest_sha256: ref.manifest_sha256,
+        source_scope_id: ref.source_scope_id,
+      },
+      collection: "activity",
+      native_clock: {
+        kind: "observation",
+        from: episode.entry.first_seen_at,
+        until: episode.entry.last_seen_at,
+      },
+      read_complete: true,
+    }));
+  }
   for (const pub of report.published) {
     for (const item of pub.findings) item.finding.finding = indexFinding;
     for (const item of pub.changes) {
@@ -104,6 +144,12 @@ export function sampleWindow(
       item.change.change.detail.text =
         "The capture mode changed during the selected interval.";
     }
+  }
+  if (request.view === "compatible-workload" && !fullReport) {
+    report.qualifications.push(
+      "The demo contains one archived Top SQL report. Its statement rankings cover the full captured window.",
+    );
+    return report;
   }
   if (request.view === "compatible-workload")
     Object.assign(report, {

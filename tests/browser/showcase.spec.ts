@@ -104,7 +104,9 @@ for (const theme of ["light", "dark"] as const) {
       );
       await page.goBack();
       await expect(
-        page.getByRole("heading", { name: "Top SQL" }),
+        page.getByText("The demo contains one archived Top SQL report.", {
+          exact: false,
+        }),
       ).toBeVisible();
     },
   );
