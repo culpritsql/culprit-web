@@ -126,6 +126,9 @@ issuer = "http://127.0.0.1:" + provider.address().port + "/tenant";
 const secret = join(fixture, "secret");
 await writeFile(secret, "fixture-secret", { mode: 0o600 });
 const regionalArchives = JSON.parse(process.env.CULPRIT_FIXTURE_ARCHIVES || "{}");
+const regionalDbaArchives = process.env.CULPRIT_FIXTURE_ARCHIVES
+  ? Object.keys(regionalArchives)
+  : ["production", "restricted"];
 const cfg = {
   public_url: base,
   metadata_db: join(fixture, "workspace.sqlite3"),
@@ -146,7 +149,7 @@ const cfg = {
       },
     ],
     grants: [
-      ...["production", "restricted"].map((archive) => ({
+      ...regionalDbaArchives.map((archive) => ({
         provider: "company",
         archive,
         claim: "roles",

@@ -31,26 +31,38 @@ try {
   await page.goto("/");
   await page.getByRole("link", { name: "Company SSO" }).click();
   await page.getByRole("button", { name: "DBA", exact: true }).click();
-  const resource = page.locator("a.db-link").first();
-  const load = page.waitForResponse((response) =>
-    response.url().endsWith("/api/archive/incident"),
+  const resourcePath = process.argv[2] || await page.locator("a.db-link").first().getAttribute("href", { timeout: 60000 });
+  assert.ok(resourcePath, "the DBA has a link to the published resource");
+  const destination = new URL(resourcePath, page.url());
+  assert.equal(destination.origin, new URL(page.url()).origin);
+  assert.equal(destination.searchParams.get("archive"), "production");
+  destination.searchParams.set("view", "incident");
+  const load = page.waitForResponse(
+    (response) => response.url().endsWith("/api/archive/incident"),
+    { timeout: 60000 },
   );
-  await resource.click({ timeout: 60000 });
-  const view = await (await load).json();
+  await page.goto(destination.href);
+  const response = await load;
+  assert.equal(response.status(), 200, "the DBA can read the incident window");
+  const view = await response.json();
+  const revision = destination.searchParams.get("incident");
   const attributed = view.report.incidents.find(
     (incident) =>
+      (!revision || incident.entry.revision_id === revision) &&
       incident.attribution_status === "established" &&
       incident.culprit_queries.some(
         (q) => q.causal_role?.kind === "native-blocking-owner",
       ),
   );
   assert.ok(attributed, "the collector established the native lock owner");
-  assert.ok(
-    view.report.incidents.some(
-      (incident) => incident.attribution_status === "unestablished",
-    ),
-    "unresolved revisions remain qualified",
-  );
+  if (!revision) {
+    assert.ok(
+      view.report.incidents.some(
+        (incident) => incident.attribution_status === "unestablished",
+      ),
+      "unresolved revisions remain qualified",
+    );
+  }
   const link = new URL(page.url());
   link.searchParams.set("incident", attributed.entry.revision_id);
   await page.goto(link.href);
@@ -89,16 +101,18 @@ try {
     .getByRole("button", { name: "Read captured text" })
     .first()
     .click();
-  const chunk = await (await chunkResponse).json();
+  const chunkRead = await chunkResponse;
+  assert.equal(chunkRead.status(), 200);
+  const originalRequest = chunkRead.request().postDataJSON();
+  const chunk = await chunkRead.json();
   const matching = chunk.records
     .flatMap((r) => r.artifacts)
     .find(
       (a) =>
         a.payload.kind === "chunk" && a.payload.sha256 === waiter.sql.sha256,
     );
-  assert.equal(
-    matching?.payload.text,
-    waiter.sql.text,
+  assert.ok(
+    matching && matching.payload.text === waiter.sql.text,
     "redacted original text agrees with the affected query",
   );
   await page.getByText(waiter.sql.text, { exact: true }).last().waitFor();
@@ -109,16 +123,16 @@ try {
     .getByRole("alert")
     .filter({ hasText: "Evidence access is required" })
     .waitFor();
-  assert.equal(
-    (await page.request.post("/api/archive/artifacts", { data: {} })).status(),
-    403,
-  );
+  for (const [route, request] of [
+    ["incident", response.request().postDataJSON()],
+    ["artifacts", originalRequest],
+  ]) {
+    const denied = await page.request.post("/api/archive/" + route, { data: request });
+    assert.equal(denied.status(), 403, "the viewer cannot replay the DBA's " + route + " request");
+  }
   console.log(
-    "Verified an attributed PostgreSQL blocking incident, the affected SQL and its original through ClickHouse and S3. The same link and original were denied to a fleet viewer.",
+    "The DBA opened the attributed blocking incident and verified the affected SQL against its original. The fleet viewer was denied the same link and original request.",
   );
-} catch (error) {
-  console.error((await page.locator("main").innerText()).slice(0, 1000));
-  throw error;
 } finally {
   await browser.close();
 }

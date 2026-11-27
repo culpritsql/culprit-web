@@ -21,9 +21,20 @@ python3 -B tests/native/verify.py
 | Input | Browser proof |
 |---|---|
 | Published SQL Server resource observation | After recovery restarts, Fleet opens the database and reports an empty incident window. |
-| PostgreSQL blocking corpus | The collector seals the activity and its focused follow-up, computes diagnostic revisions and publishes the derived findings. Once the publisher exits, a DBA opens the established blocking owner and reads the affected statement from its authenticated original. A viewer is denied the shared link and direct original route. |
+| PostgreSQL blocking corpus | A DBA opens the established blocking owner and reads the affected statement from its original. A fleet viewer receives a denial for the same incident link and a 403 when replaying the DBA's successful original-SQL request. |
+| Regional outage | The runner stops both European stores. Europe reports an error while the US fleet, incident and original remain accessible in the same web process. Each ClickHouse archive uses its own read-only login. |
+| Missing Azure identity | The same process opens an ADX/Blob configuration for Japan. Its missing workload identity assertion produces an error on the Japan card while the other archives remain independently readable. |
 
-The workload and incident inputs are controlled fixtures. Real Entra sign-in and the end-to-end Azure Data Explorer plus Blob journey require a deployment with those services.
+### Verify Azure Data Explorer and Blob alongside ClickHouse
+
+Use a dedicated archive of synthetic incidents. Give the web process an evidence config with read access to ADX and Blob. Select a published native blocking incident with an affected statement and its original SQL. Supply its investigation link from a deployment using the same config and archive name `production`. The fixture follows the link's database, archive revision and time window on loopback.
+
+```sh
+python3 -B tests/native/verify.py --azure-archive /path/to/azure-evidence.json \
+  --incident-link "$CULPRIT_TEST_INCIDENT_URL"
+```
+
+This run reads the supplied archive. It creates the other region's ClickHouse/S3 stores locally, stops them, and repeats the evidence and access checks against Azure. The test identity provider runs on loopback. Live Microsoft Entra sign-in requires the tenant's registered web application.
 
 ## Refresh the README screenshots
 

@@ -1,0 +1,91 @@
+{
+  "public_url": "https://culprit.example.com",
+  "archives": [
+    {
+      "name": "orders-us",
+      "region": "United States",
+      "evidence_config": "/run/config/us-clickhouse.json"
+    },
+    {
+      "name": "orders-eu",
+      "region": "Europe",
+      "evidence_config": "/run/config/eu-adx.json"
+    },
+    {
+      "name": "orders-jp",
+      "region": "Japan",
+      "evidence_config": "/run/config/jp-clickhouse.json"
+    }
+  ],
+  "auth": {
+    "providers": [
+      {
+        "id": "corporate",
+        "label": "Sign in with Microsoft",
+        "issuer": "https://login.microsoftonline.com/YOUR-TENANT-ID/v2.0",
+        "client_id": "YOUR-APPLICATION-ID",
+        "client_secret_file": "/run/secrets/oidc-client"
+      }
+    ],
+    "grants": [
+      {
+        "provider": "corporate",
+        "archive": "orders-us",
+        "claim": "roles",
+        "value": "Culprit.RegionalViewer",
+        "permissions": [
+          "view_reports"
+        ]
+      },
+      {
+        "provider": "corporate",
+        "archive": "orders-eu",
+        "claim": "roles",
+        "value": "Culprit.RegionalViewer",
+        "permissions": [
+          "view_reports"
+        ]
+      },
+      {
+        "provider": "corporate",
+        "archive": "orders-jp",
+        "claim": "roles",
+        "value": "Culprit.RegionalViewer",
+        "permissions": [
+          "view_reports"
+        ]
+      },
+      {
+        "provider": "corporate",
+        "archive": "orders-us",
+        "claim": "roles",
+        "value": "Culprit.DBA.US",
+        "permissions": [
+          "view_reports",
+          "inspect_evidence"
+        ]
+      },
+      {
+        "provider": "corporate",
+        "archive": "orders-eu",
+        "claim": "roles",
+        "value": "Culprit.DBA.EU",
+        "permissions": [
+          "view_reports",
+          "inspect_evidence"
+        ]
+      },
+      {
+        "provider": "corporate",
+        "archive": "orders-jp",
+        "claim": "roles",
+        "value": "Culprit.DBA.JP",
+        "permissions": [
+          "view_reports",
+          "inspect_evidence"
+        ]
+      }
+    ]
+  },
+  "metadata_db": "/var/lib/culprit-web/workspace.sqlite3"
+}

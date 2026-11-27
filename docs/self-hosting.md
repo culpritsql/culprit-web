@@ -24,17 +24,17 @@ Run the binary from the directory containing `dist/`. It listens on `127.0.0.1:8
 
 Configure one entry for each independently published pipeline and shard. Use a stable, unique `name` for links and access grants. The optional `region` is a display label. Multiple archives may share a region, including archives on different warehouse backends.
 
-```json
-{
-  "archives": [
-    { "name": "orders-us", "region": "United States", "evidence_config": "/run/config/us-clickhouse.json" },
-    { "name": "orders-eu", "region": "Europe", "evidence_config": "/run/config/eu-adx.json" },
-    { "name": "orders-jp", "region": "Japan", "evidence_config": "/run/config/jp-clickhouse.json" }
-  ]
-}
-```
+Existing single-archive files can continue to use `archive_name` and `evidence_config`. A user can discover an archive when one of their grants includes it.
 
-Each evidence file specifies its own read credentials, warehouse endpoint and recovery bucket or Blob container. Mount the files referenced in your configuration. Map an identity provider role to each archive it may access. A role with a database-specific grant sees its assigned databases.
+The regional example uses one sign-in provider and three independent evidence files. Copy the matching warehouse template for each row and set its endpoint, read identity, pipeline, shard and recovery namespace. Mount the files alongside `web.json`. [Regional web configuration](../config/web.regional.example.json)
+
+| Archive | Evidence file under `/run/config` | Warehouse and originals |
+|---|---|---|
+| `orders-us` | `us-clickhouse.json` | US ClickHouse and US S3 |
+| `orders-eu` | `eu-adx.json` | European ADX and Azure Blob |
+| `orders-jp` | `jp-clickhouse.json` | Japanese ClickHouse and Japanese S3 |
+
+The example grants `Culprit.RegionalViewer` fleet summaries in all three archives. `Culprit.DBA.EU` grants inspection of European SQL and plans. A person with both roles can see three fleets and inspect evidence in Europe. Use separate warehouse password variables, AWS profiles or Azure identities wherever the archives use different credentials.
 
 Accounts with fleet access to multiple archives open on **Regional fleets**, with one card per authorized archive. Cards on the same page read at one UTC cutoff and report failures individually. A DBA opens one archive to inspect database rows and original evidence. Deep links and saved investigations carry the archive name and revision as well as the database identity.
 
@@ -67,15 +67,6 @@ docker run --rm -p 127.0.0.1:8080:8080 \
 Place `web.json`, its referenced archive config and the referenced OIDC secret at the mounted paths. Make them readable by UID 65532. For ClickHouse and S3, also pass the configured password environment variable and mount or supply the AWS profile and its credential source. `GET /healthz` reports process liveness. An authenticated fleet read exercises the storage path.
 
 ## Assign individual databases
-
-Use `archives` to configure several independently credentialed archives in the same process. Existing single-archive files with `archive_name` and `evidence_config` still load. An archive must appear in a matching grant before a user can discover it.
-
-```json
-"archives": [
-  { "name": "production", "evidence_config": "/run/config/production.json" },
-  { "name": "analytics", "evidence_config": "/run/config/analytics.json" }
-]
-```
 
 Add `resources` to a grant to limit it to named databases. Copy both complete selector values from the published fleet row. A database name can recur across namespaces. The label here is for navigation.
 

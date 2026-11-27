@@ -186,6 +186,48 @@ mod tests {
     }
 
     #[test]
+    fn regional_example_grants_global_summaries_and_local_evidence() {
+        use crate::access::{Access, Actor};
+        use std::collections::BTreeMap;
+
+        let config: Config =
+            serde_json::from_str(include_str!("../config/web.regional.example.json")).unwrap();
+        let actor = Actor {
+            issuer: "corporate".into(),
+            subject: "fixture".into(),
+        };
+        let access = |roles: &[&str]| {
+            let claims = BTreeMap::from([("roles".into(), serde_json::json!(roles))]);
+            Access::from_claims("corporate", actor.clone(), &claims, &config.auth.grants).unwrap()
+        };
+        let viewer = access(&["Culprit.RegionalViewer"]);
+        assert_eq!(viewer.archives.len(), 3);
+        for grant in viewer.archives.values() {
+            assert!(grant.view_fleet);
+            assert!(!grant.inspect_evidence && !grant.export_evidence);
+        }
+
+        for (role, archive) in [
+            ("Culprit.DBA.US", "orders-us"),
+            ("Culprit.DBA.EU", "orders-eu"),
+            ("Culprit.DBA.JP", "orders-jp"),
+        ] {
+            let local = access(&[role]);
+            assert_eq!(local.archives.len(), 1);
+            assert!(local.archives[archive].inspect_evidence);
+            assert!(!local.archives[archive].export_evidence);
+        }
+
+        let global = access(&["Culprit.RegionalViewer", "Culprit.DBA.EU"]);
+        assert_eq!(global.archives.len(), 3);
+        for (name, grant) in global.archives {
+            assert!(grant.view_fleet);
+            assert_eq!(grant.inspect_evidence, name == "orders-eu");
+            assert!(!grant.export_evidence);
+        }
+    }
+
+    #[test]
     fn grants_are_bound_to_a_configured_archive_and_provider() {
         let mut config: Config =
             serde_json::from_str(include_str!("../config/web.example.json")).unwrap();
