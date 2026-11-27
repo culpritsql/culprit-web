@@ -1,15 +1,14 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import type { CollectedWindowSection } from "../../vendor/culprit/app/src/gen/CollectedWindowSection";
 import type { WindowWorkload } from "../../vendor/culprit/app/src/gen/WindowWorkload";
 import type { QueryStat } from "../../vendor/culprit/app/src/gen/QueryStat";
+import type { ArchiveRange } from "./navigation";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import { WorkloadTimeline } from "./WorkloadTimeline";
-import { CapturedPlan } from "./CapturedPlan";
-import { stamp } from "./shared";
+import { StatementEvidence } from "./StatementEvidence";
+import { stamp, quantity } from "./shared";
 import w from "./en.json";
 
-const format = new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 });
-const quantity = (value: number | null) =>
-  value === null ? "—" : format.format(value);
 type Metric = "total_time_ms" | "mean_time_ms" | "executions";
 const metrics: Record<Metric, string> = {
   total_time_ms: w.totalTime,
@@ -30,43 +29,62 @@ function Statement({
   maximum: number;
   metric: Metric;
 }) {
+  const [open, setOpen] = useState(false);
+  const detailId = useId();
   return (
-    <tr>
-      <td>
-        <details>
-          <summary>
+    <>
+      <tr>
+        <td>
+          <button
+            type="button"
+            className="statement-toggle"
+            aria-expanded={open}
+            aria-controls={open ? detailId : undefined}
+            onClick={() => setOpen(!open)}
+          >
+            {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
             <span className="sql-summary">
               {query.object_name || query.text || query.id}
             </span>
-          </summary>
-          <pre>{query.text || w.noPayload}</pre>
-          <small>{query.id}</small>
-          {query.plan && <CapturedPlan plan={query.plan} />}
-        </details>
-      </td>
-      <td>
-        <div className="query-bar">
-          <div className="track" aria-hidden="true">
-            <i
-              style={{
-                width:
-                  (maximum > 0 ? (100 * query[metric]) / maximum : 0) + "%",
-              }}
-            />
+          </button>
+        </td>
+        <td>
+          <div className="query-bar">
+            <div className="track" aria-hidden="true">
+              <i
+                style={{
+                  width:
+                    (maximum > 0 ? (100 * query[metric]) / maximum : 0) + "%",
+                }}
+              />
+            </div>
+            {quantity(query[metric])}
           </div>
-          {quantity(query[metric])}
-        </div>
-      </td>
-      {otherMetrics(metric).map((key) => (
-        <td key={key}>{quantity(query[key])}</td>
-      ))}
-      <td>{quantity(query.cpu_time_ms)}</td>
-      <td>{quantity(query.logical_reads)}</td>
-    </tr>
+        </td>
+        {otherMetrics(metric).map((key) => (
+          <td key={key}>{quantity(query[key])}</td>
+        ))}
+        <td>{quantity(query.cpu_time_ms)}</td>
+        <td>{quantity(query.logical_reads)}</td>
+      </tr>
+      {open && (
+        <tr className="statement-evidence-row">
+          <td id={detailId} colSpan={6}>
+            <StatementEvidence query={query} />
+          </td>
+        </tr>
+      )}
+    </>
   );
 }
 
-function Population({ section }: { section: CollectedWindowSection }) {
+function Population({
+  section,
+  range,
+}: {
+  section: CollectedWindowSection;
+  range: ArchiveRange;
+}) {
   const [metric, setMetric] = useState<Metric>("total_time_ms");
   const queries = [...(section.analysis.workload?.queries ?? [])].sort(
     (a, b) => b[metric] - a[metric],
@@ -112,7 +130,10 @@ function Population({ section }: { section: CollectedWindowSection }) {
         )}
       </div>
       {section.analysis.workload?.timeline && (
-        <WorkloadTimeline timeline={section.analysis.workload.timeline} />
+        <WorkloadTimeline
+          timeline={section.analysis.workload.timeline}
+          range={range}
+        />
       )}
       {queries.length ? (
         <div className="table-scroll">
@@ -171,7 +192,13 @@ function Population({ section }: { section: CollectedWindowSection }) {
   );
 }
 
-export function Workload({ workload }: { workload: WindowWorkload }) {
+export function Workload({
+  workload,
+  range,
+}: {
+  workload: WindowWorkload;
+  range: ArchiveRange;
+}) {
   if (workload.kind !== "evaluated")
     return <p className="notice">{w.noWorkload}</p>;
   return (
@@ -180,7 +207,7 @@ export function Workload({ workload }: { workload: WindowWorkload }) {
         <p className="panel notice">{w.noWorkload}</p>
       )}
       {workload.analysis.sections.map((section) => (
-        <Population key={section.analysis_id} section={section} />
+        <Population key={section.analysis_id} section={section} range={range} />
       ))}
       {workload.analysis.gaps.map((gap, i) => (
         <p className="muted" key={i}>

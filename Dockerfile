@@ -2,6 +2,7 @@ FROM oven/bun:1.4.2@sha256:9114c058aeae42162ee16dd5084b95fe9473970bb6bcb5b232ab1
 WORKDIR /src
 COPY package.json bun.lock ./
 RUN bun install --frozen-lockfile
+COPY vendor/culprit/packages/culprit-archive-client/src vendor/culprit/packages/culprit-archive-client/src
 COPY vendor/culprit/app/src/gen vendor/culprit/app/src/gen
 COPY vendor/culprit/docs/images/logo.svg vendor/culprit/docs/images/logo.svg
 COPY src/ui src/ui

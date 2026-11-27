@@ -10,11 +10,17 @@ const Viewer = lazy(async () => {
   return { default: module.PlanViewer };
 });
 
-export function CapturedPlan({ plan }: { plan: Plan }) {
+export function CapturedPlan({
+  plan,
+  label = w.executionPlan,
+}: {
+  plan: Plan;
+  label?: string;
+}) {
   const [open, setOpen] = useState(false);
   return (
     <details onToggle={(event) => setOpen(event.currentTarget.open)}>
-      <summary>{w.executionPlan}</summary>
+      <summary>{label}</summary>
       {open && (
         <Suspense fallback={<p role="status">{w.loading}</p>}>
           <Viewer plan={plan} />

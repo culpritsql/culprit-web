@@ -74,3 +74,12 @@ export function putRange(params: URLSearchParams, range: ArchiveRange) {
   params.set("until", range.until);
   params.set("asof", range.recorded_before);
 }
+
+export function rangeUrl(bounds: ArchiveRange) {
+  const url = new URL(location.href);
+  url.searchParams.delete("incident");
+  putRange(url.searchParams, bounds);
+  const midpoint = (Date.parse(bounds.from) + Date.parse(bounds.until)) / 2;
+  url.searchParams.set("around", new Date(midpoint).toISOString());
+  return url.pathname + url.search;
+}

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Clock3 } from "lucide-react";
 import { stamp } from "./shared";
-import { putRange, type ArchiveRange } from "./navigation";
+import { rangeUrl, type ArchiveRange } from "./navigation";
 import w from "./en.json";
 
 function inputTime(iso: string) {
@@ -33,16 +33,7 @@ export function RangeSelection({ range }: { range: ArchiveRange }) {
             setError(w.invalidRange);
             return;
           }
-          const url = new URL(location.href);
-          url.searchParams.delete("incident");
-          putRange(url.searchParams, bounds);
-          url.searchParams.set(
-            "around",
-            new Date(
-              (Date.parse(bounds.from) + Date.parse(bounds.until)) / 2,
-            ).toISOString(),
-          );
-          location.assign(url);
+          location.assign(rangeUrl(bounds));
         }}
       >
         <label>

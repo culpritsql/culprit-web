@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import type { WarehouseFleetCursor } from "../../vendor/culprit/app/src/gen/WarehouseFleetCursor";
 import { api, useRead, type WarehouseConnectionRef } from "./api";
+import { fleetRequest } from "./fleetRequest";
 import { FleetCharts } from "./FleetCharts";
 import { investigationUrl } from "./navigation";
 import type { PublishedResourceSelector } from "./api";
@@ -33,24 +34,7 @@ export function Fleet({
   const after = cursors[cursors.length - 1];
   const load = useCallback(
     (signal: AbortSignal) =>
-      api.fleet(
-        connection,
-        {
-          as_of: asOf,
-          window: null,
-          max_age_seconds: 3600,
-          filter: {
-            environment: null,
-            engine: null,
-            attention_only: attention,
-            shared_group: null,
-          },
-          sort: "attention",
-          page_rows: 20,
-          after,
-        },
-        signal,
-      ),
+      api.fleet(connection, fleetRequest(asOf, 20, attention, after), signal),
     [connection, asOf, attention, after],
   );
   const data = useRead(load);

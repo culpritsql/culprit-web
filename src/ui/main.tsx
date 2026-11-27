@@ -83,6 +83,7 @@ function App() {
             <ReadDefaults.Provider value={session.value.read_defaults}>
               <Workspace
                 access={access}
+                regions={session.value.regions ?? {}}
                 savedEnabled={session.value.saved_views_enabled}
               />
             </ReadDefaults.Provider>

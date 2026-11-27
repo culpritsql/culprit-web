@@ -20,6 +20,26 @@ Run the binary from the directory containing `dist/`. It listens on `127.0.0.1:8
 2. Copy the configuration for the installed warehouse and recovery service. Match the collector's pipeline, shard, database and recovery namespace. Supply credentials with read access to the published warehouse data and recovery objects. [ClickHouse and S3](../config/archive.example.json) · [ADX and Azure Blob](../config/archive.azure.example.json)
 3. For the ClickHouse example, supply `CULPRIT_WAREHOUSE_PASSWORD` to the server and make the configured AWS profile available to its OS user. The container includes the AWS CLI. The Azure example uses a managed identity. Workload identity can also be configured using the upstream credential profile. [Archive reader configuration](https://github.com/culpritsql/culprit-sql-studio/blob/main/docs/collector.md)
 
+### Regional archives
+
+Configure one entry for each independently published pipeline and shard. Use a stable, unique `name` for links and access grants. The optional `region` is a display label. Multiple archives may share a region, including archives on different warehouse backends.
+
+```json
+{
+  "archives": [
+    { "name": "orders-us", "region": "United States", "evidence_config": "/run/config/us-clickhouse.json" },
+    { "name": "orders-eu", "region": "Europe", "evidence_config": "/run/config/eu-adx.json" },
+    { "name": "orders-jp", "region": "Japan", "evidence_config": "/run/config/jp-clickhouse.json" }
+  ]
+}
+```
+
+Each evidence file specifies its own read credentials, warehouse endpoint and recovery bucket or Blob container. Mount the files referenced in your configuration. Map an identity provider role to each archive it may access. A role with a database-specific grant sees its assigned databases.
+
+**Regional fleets** shows one card per authorized fleet archive. Cards on the same page read at one UTC cutoff and report failures individually. A DBA opens one archive to inspect database rows and original evidence. Deep links and saved investigations carry the archive name and revision as well as the database identity.
+
+The web service reads selected data from its configured regions. For installations that require evidence and audit metadata to stay within a region, deploy the service and its metadata volume in that region and configure only the permitted sources.
+
 ## Configure company sign-in
 
 1. For Microsoft Entra ID, register a single-tenant **Web** application. Set the redirect URI to `https://YOUR-HOST/auth/callback/corporate`. Set the tenant-specific issuer with the tenant GUID, application client ID and a mounted client secret file in the web configuration.

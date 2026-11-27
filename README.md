@@ -23,9 +23,27 @@ See which databases need attention, where incidents cluster and which collectors
   <img src="docs/images/fleet-light.png" alt="Fleet overview of eight sample databases, showing six active incidents and two databases with stale or partial collection" width="100%">
 </picture>
 
+## Try the demo
+
+Run the sample estate locally with Bun. It opens with DBA access and uses the same React build as the self-hosted app.
+
+```sh
+git clone --recurse-submodules https://github.com/culpritsql/culprit-web.git
+cd culprit-web
+bun install --frozen-lockfile
+bun run demo
+```
+
+Open [Regional fleets](http://127.0.0.1:4390/?view=regions). Choose the United States, open **Checkout**, then follow the blocking incident or inspect **Workload**. Europe and Japan have separate sample fleets.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/regions-dark.png">
+  <img src="docs/images/regions-light.png" alt="Three regional archives, each showing its own resource, incident and collection coverage counts" width="100%">
+</picture>
+
 ## Quickstart
 
-Connect a published **ClickHouse + S3** or **Azure Data Explorer + Azure Blob** archive and your company's OIDC provider. One service serves the React app, handles sign-in and reads the archive. The collector and source database can be offline.
+Connect a published **ClickHouse + S3** or **Azure Data Explorer + Azure Blob** archive and your company's OIDC provider. One service serves the React app, handles sign-in and reads the configured archives. Give each regional archive its own endpoints, object storage and access grants. The collector and source database can be offline.
 
 ```sh
 git clone --recurse-submodules https://github.com/culpritsql/culprit-web.git
@@ -48,7 +66,7 @@ Save a view for your next shift or share a link to the database, time window and
 
 ## Historical workload
 
-Rank statements by total time, calls or mean duration. Inspect native time buckets, expand captured plans and review changes across comparable periods. Each source population keeps its own totals.
+Rank statements by total time, calls or mean duration. Drag across a spike or select buckets with the keyboard to investigate that exact interval. Expand a statement to inspect recorded waits, calls and runtime by plan, and captured execution plans. Each source population keeps its own totals.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/workload-dark.png">

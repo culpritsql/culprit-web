@@ -12,7 +12,7 @@ bunx playwright install chromium --only-shell
 bun run test:e2e
 ```
 
-Browser tests run the application binary with a disposable loopback OIDC provider, real signed tokens and synthetic archive responses. They exercise authorization on the HTTP routes, incident links across sign-in, window pagination and explicit reads of original payloads. The native storage test uses Docker, the AWS CLI and Python 3. It exercises two archives on disposable ClickHouse and S3-compatible storage.
+Browser tests run the application binary with a disposable loopback OIDC provider, real signed tokens and synthetic archive responses. They exercise authorization on the HTTP routes, incident links across sign-in, window pagination and explicit reads of original payloads. The native storage test uses Docker, the AWS CLI and Python 3. It starts two independent ClickHouse servers and two S3-compatible object stores. One web process serves both archives. A regional DBA opens the European SQL Server history, while a US-scoped DBA and viewer exercise the PostgreSQL incident and its evidence permissions.
 
 ```sh
 python3 -B tests/native/verify.py
@@ -30,7 +30,7 @@ The workload and incident inputs are controlled fixtures. Real Entra sign-in and
 ```sh
 bun run build
 cargo build --locked
-CULPRIT_WEB_SCREENSHOTS=1 bun run test:e2e showcase
+CULPRIT_WEB_SCREENSHOTS=1 bun run test:e2e showcase demo
 ```
 
 The showcase signs in with a disposable OIDC identity, opens Checkout from Fleet, follows the resource into Workload and expands a captured plan. It captures both system themes. Fleet and incident responses describe an illustrative estate. The workload uses the pinned SQL Server sample report with its recorded queries and plans.

@@ -1,14 +1,12 @@
 import { createContext, useContext, useEffect, useState } from "react";
-import type { WarehouseConnectionRef } from "../../vendor/culprit/app/src/gen/WarehouseConnectionRef";
-import type { WarehouseConnectionInfo } from "../../vendor/culprit/app/src/gen/WarehouseConnectionInfo";
-import type { WarehouseFleetRequest } from "../../vendor/culprit/app/src/gen/WarehouseFleetRequest";
-import type { WarehouseFleetReport } from "../../vendor/culprit/app/src/gen/WarehouseFleetReport";
-import type { WarehouseIncidentView } from "../../vendor/culprit/app/src/gen/WarehouseIncidentView";
-import type { WarehouseArtifactQuery } from "../../vendor/culprit/app/src/gen/WarehouseArtifactQuery";
-import type { WarehouseArtifactReport } from "../../vendor/culprit/app/src/gen/WarehouseArtifactReport";
-import type { PublishedResourceSelector } from "../../vendor/culprit/app/src/gen/PublishedResourceSelector";
-import type { WarehouseWindowQuery } from "../../vendor/culprit/app/src/gen/WarehouseWindowQuery";
-import type { WarehouseWindowReport } from "../../vendor/culprit/app/src/gen/WarehouseWindowReport";
+import {
+  createArchiveClient,
+  type PublishedResourceSelector,
+  type WarehouseArtifactQuery,
+  type WarehouseArtifactReport,
+  type WarehouseConnectionRef,
+  type WarehouseFleetRequest,
+} from "../../vendor/culprit/packages/culprit-archive-client/src";
 import words from "./en.json";
 export type {
   WarehouseConnectionRef,
@@ -44,6 +42,7 @@ export interface ArchiveAccess {
   }[];
 }
 export interface Session {
+  regions?: Record<string, string>;
   saved_views_enabled: boolean;
   read_defaults: { window_page_rows: number; artifact_chunk_chars: number };
   access: { archives: Record<string, ArchiveAccess> } | null;
@@ -87,6 +86,10 @@ async function request<T>(
   return response.json() as Promise<T>;
 }
 
+const archive = createArchiveClient((method, path, body, signal) =>
+  request(path, signal, body, method),
+);
+
 export const api = {
   saved: (signal: AbortSignal) =>
     request<Bookmark[]>("/api/workspace/saved", signal),
@@ -105,50 +108,13 @@ export const api = {
     }),
   session: (signal: AbortSignal) => request<Session>("/api/session", signal),
   connections: async (signal: AbortSignal) =>
-    (
-      await request<WarehouseConnectionInfo[]>(
-        "/api/archive/connections",
-        signal,
-      )
-    ).map((c) => c.reference),
-  fleet: (
-    connection: WarehouseConnectionRef,
-    query: WarehouseFleetRequest,
-    signal: AbortSignal,
-  ) =>
-    request<WarehouseFleetReport>("/api/archive/fleet", signal, {
-      connection,
-      request: query,
-    }),
-  incident: (
-    connection: WarehouseConnectionRef,
-    resource: PublishedResourceSelector,
-    around: string,
-    signal: AbortSignal,
-  ) =>
-    request<WarehouseIncidentView>("/api/archive/incident", signal, {
-      connection,
-      resource,
-      around,
-    }),
-  window: (
-    connection: WarehouseConnectionRef,
-    query: WarehouseWindowQuery,
-    signal: AbortSignal,
-  ) =>
-    request<WarehouseWindowReport>("/api/archive/window", signal, {
-      connection,
-      request: query,
-    }),
-  artifacts: (
-    connection: WarehouseConnectionRef,
-    query: WarehouseArtifactQuery,
-    signal: AbortSignal,
-  ) =>
-    request<WarehouseArtifactReport>("/api/archive/artifacts", signal, {
-      connection,
-      request: query,
-    }),
+    (await archive.warehouseConnections(signal)).map(
+      ({ reference }) => reference,
+    ),
+  fleet: archive.warehouseFleet,
+  incident: archive.warehouseIncident,
+  window: archive.warehouseWindow,
+  artifacts: archive.warehouseArtifacts,
 };
 
 type Load<T> =

@@ -1,3 +1,4 @@
+import { RegionalFleet } from "./RegionalFleet";
 import { Database, ChevronRight } from "lucide-react";
 import {
   api,
@@ -37,8 +38,10 @@ export function mayInspect(
 export function Workspace({
   access,
   savedEnabled,
+  regions,
 }: {
   savedEnabled: boolean;
+  regions: Record<string, string>;
   access: NonNullable<Session["access"]>;
 }) {
   const result = useRead(api.connections);
@@ -52,10 +55,24 @@ export function Workspace({
   const name = params.get("archive");
   const revision = params.get("revision");
   const connections = result.value;
-  const connection = name
-    ? connections.find((c) => c.name === name)
-    : revision
-      ? connections.find((c) => c.revision === revision)
+  const fleetArchives = connections.filter(
+    (item) => access.archives[item.name]?.view_fleet,
+  );
+  const overview =
+    !name &&
+    !revision &&
+    !params.has("database") &&
+    params.get("view") === "regions";
+  if (overview)
+    return <RegionalFleet connections={fleetArchives} regions={regions} />;
+  const candidates = connections.filter((item) =>
+    name ? item.name === name : item.revision === revision,
+  );
+  const connection =
+    name || revision
+      ? candidates.length === 1
+        ? candidates[0]
+        : undefined
       : connections[0];
   if (!connection || !Object.hasOwn(access.archives, connection.name))
     return <StateMessage error={w.badLink} />;
@@ -91,6 +108,12 @@ export function Workspace({
   return (
     <ExportAccess.Provider value={investigating && allowExport}>
       <nav className="crumb" aria-label={w.workspace}>
+        {fleetArchives.length > 1 && (
+          <>
+            <a href="/?view=regions">{w.regionalFleet}</a>
+            <ChevronRight size={13} />
+          </>
+        )}
         <Database size={15} />
         {connections.length > 1 ? (
           <select
@@ -99,11 +122,17 @@ export function Workspace({
             onChange={(e) => location.assign(archiveUrl(e.target.value))}
           >
             {connections.map((c) => (
-              <option key={c.name}>{c.name}</option>
+              <option key={c.name} value={c.name}>
+                {regions[c.name] ? regions[c.name] + " · " : ""}
+                {c.name}
+              </option>
             ))}
           </select>
         ) : (
-          <span>{connection.name}</span>
+          <span>
+            {regions[connection.name] ? regions[connection.name] + " · " : ""}
+            {connection.name}
+          </span>
         )}
         <ChevronRight size={13} />
         <a href={archiveUrl(connection.name)}>{w.fleet}</a>

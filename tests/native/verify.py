@@ -1,4 +1,5 @@
 """Exercise empty and attributed incident windows through signed-in browsers and native storage."""
+from contextlib import ExitStack
 import importlib.util
 import json
 import os
@@ -37,7 +38,7 @@ def wait_for_app(server):
     raise RuntimeError("The fixture web process did not become ready")
 
 
-def browse(directory, ports, pipeline, prefix, journey):
+def archive_config(directory, ports, pipeline, prefix):
     config = json.loads((ROOT / "config/archive.example.json").read_text())
     config["pipeline"] = pipeline
     config["credentials"]["warehouse-read"].update(username="culprit_fixture", variable="CULPRIT_FIXTURE_PASSWORD")
@@ -49,19 +50,24 @@ def browse(directory, ports, pipeline, prefix, journey):
         bucket="delivery-fixture", region="us-east-1", prefix=prefix,
         endpoint="http://127.0.0.1:" + ports["CULPRIT_TEST_S3_PORT"],
     )
-    archive = directory / "archive.json"
+    archive = directory / (pipeline + ".json")
     archive.write_text(json.dumps(config))
+    return str(archive)
+
+
+def browse(directory, archives):
     keys = directory / "credentials"
     keys.write_text("[culprit-archive-reader]\naws_access_key_id=fixture-access-key\naws_secret_access_key=fixture-secret-key\n")
     keys.chmod(0o600)
-    environment = {**os.environ, "CULPRIT_FIXTURE_ARCHIVE": str(archive),
+    environment = {**os.environ, "CULPRIT_FIXTURE_ARCHIVES": json.dumps(archives),
                    "CULPRIT_FIXTURE_PASSWORD": "owned-fixture-password",
                    "AWS_CONFIG_FILE": str(directory / "aws-config"), "AWS_SHARED_CREDENTIALS_FILE": str(keys),
                    "AWS_EC2_METADATA_DISABLED": "true"}
     server = subprocess.Popen(["node", "tests/serve.mjs"], cwd=ROOT, env=environment)
     try:
         wait_for_app(server)
-        subprocess.run(["node", str(ROOT / "tests/native" / journey)], cwd=ROOT, check=True, timeout=200)
+        for journey in ("fleet.mjs", "incident.mjs"):
+            subprocess.run(["node", str(ROOT / "tests/native" / journey)], cwd=ROOT, check=True, timeout=200)
     finally:
         server.terminate()
         server.wait(timeout=20)
@@ -70,15 +76,23 @@ def browse(directory, ports, pipeline, prefix, journey):
 def main():
     subprocess.run(["cargo", "build", "--locked", "--example", "publish-incident-fixture"], cwd=ROOT, check=True)
     binary = test_binary("culprit-blob-s3")
-    with load_fixture("s3")() as recovery, load_fixture("clickhouse")() as warehouse:
-        ports = {**recovery, **warehouse}
-        run_test(binary, "tests::s3_recovery_clickhouse_delivery_and_restart", ports)
-        with tempfile.TemporaryDirectory(prefix="culprit-web-native-") as scratch:
-            directory = Path(scratch)
-            browse(directory, ports, "s3-clickhouse", "pipeline/shard", "fleet.mjs")
-            subprocess.run([ROOT / "target/debug/examples/publish-incident-fixture"], cwd=ROOT,
-                           env={**os.environ, **ports}, check=True, timeout=120)
-            browse(directory, ports, "incident-browser", "incident/shard", "incident.mjs")
+    with ExitStack() as owned:
+        directory = Path(owned.enter_context(tempfile.TemporaryDirectory(prefix="culprit-web-regions-")))
+        def region():
+            ports = {**owned.enter_context(load_fixture("s3")()),
+                     **owned.enter_context(load_fixture("clickhouse")())}
+            # Install the warehouse contract and recovery bucket using the upstream publisher.
+            run_test(binary, "tests::s3_recovery_clickhouse_delivery_and_restart", ports)
+            return ports
+
+        europe = region()
+        united_states = region()
+        subprocess.run([ROOT / "target/debug/examples/publish-incident-fixture"], cwd=ROOT,
+                       env={**os.environ, **united_states}, check=True, timeout=120)
+        browse(directory, {
+            "production": archive_config(directory, united_states, "incident-browser", "incident/shard"),
+            "restricted": archive_config(directory, europe, "s3-clickhouse", "pipeline/shard"),
+        })
 
 
 if __name__ == "__main__":

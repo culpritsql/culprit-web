@@ -103,7 +103,7 @@ export function WindowData({
   return (
     <>
       {view === "workload" ? (
-        <Workload workload={data.workload} />
+        <Workload workload={data.workload} range={report} />
       ) : (
         <Coverage originals={data.originals} />
       )}

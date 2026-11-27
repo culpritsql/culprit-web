@@ -19,6 +19,7 @@ struct ConfigFile {
 #[serde(deny_unknown_fields)]
 pub struct ArchiveConfig {
     pub name: String,
+    pub region: Option<String>,
     pub evidence_config: PathBuf,
 }
 
@@ -38,6 +39,7 @@ impl TryFrom<ConfigFile> for Config {
             (Some(name), Some(evidence_config)) if file.archives.is_empty() => {
                 vec![ArchiveConfig {
                     name,
+                    region: None,
                     evidence_config,
                 }]
             }
@@ -112,6 +114,13 @@ impl Config {
         }
         let mut archives = HashSet::new();
         for archive in &self.archives {
+            if archive
+                .region
+                .as_ref()
+                .is_some_and(|region| region.trim().is_empty())
+            {
+                return Err("an archive region must have a nonempty label");
+            }
             if archive.name.trim().is_empty()
                 || !archives.insert(archive.name.as_str())
                 || archive.evidence_config.as_os_str().is_empty()

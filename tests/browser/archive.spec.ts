@@ -387,3 +387,62 @@ test("an explicit UTC range stays selected across workload, operational and sche
     page.getByRole("heading", { name: "Incident revisions" }),
   ).toBeVisible();
 });
+
+test("regional fleets restrict discovery, isolate an unavailable archive and route duplicate database names", async ({
+  page,
+}) => {
+  await fixture(page);
+  const reads: string[] = [];
+  let europeOffline = true;
+  await page.route("**/api/archive/fleet", async (route) => {
+    const { connection } = route.request().postDataJSON();
+    reads.push(connection.name);
+    if (connection.name === "restricted" && europeOffline)
+      return route.fulfill({
+        status: 503,
+        body: "European archive unavailable",
+      });
+    await route.fallback();
+  });
+  await page.route("**/api/archive/incident", (route) => {
+    const value = JSON.parse(incidentFixture);
+    const archive = route.request().postDataJSON().connection.name;
+    value.report.incidents[0].entry.title = archive + " blocking incident";
+    return route.fulfill({ json: value });
+  });
+  await page.goto("/?view=regions");
+  expect(
+    (await (await page.request.get("/api/session")).json()).regions,
+  ).toEqual({});
+  await signIn(page, "Regional DBA");
+  const us = page.getByRole("article").filter({ hasText: "United States" });
+  const europe = page.getByRole("article").filter({ hasText: "Europe" });
+  await expect(us.locator("dd").first()).toHaveText("1");
+  await expect(europe.getByRole("alert")).toHaveText(
+    "European archive unavailable",
+  );
+  expect(
+    (await (await page.request.get("/api/session")).json()).regions,
+  ).toEqual({ production: "United States", restricted: "Europe" });
+  expect(await page.getByText("Japan").count()).toBe(0);
+  expect(reads.sort()).toEqual(["production", "restricted"]);
+  europeOffline = false;
+  await europe.getByRole("link", { name: "Open fleet" }).click();
+  await page.getByRole("link", { name: "Orders", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "restricted blocking incident" }),
+  ).toBeVisible();
+  const euLink = page.url();
+  await page.getByLabel("Archive", { exact: true }).selectOption("production");
+  await page.getByRole("link", { name: "Orders", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "production blocking incident" }),
+  ).toBeVisible();
+  expect(new URL(page.url()).searchParams.get("database")).toBe(
+    new URL(euLink).searchParams.get("database"),
+  );
+  await page.goto(euLink);
+  await expect(
+    page.getByRole("heading", { name: "restricted blocking incident" }),
+  ).toBeVisible();
+});

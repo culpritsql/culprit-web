@@ -809,14 +809,6 @@ select {
 .histogram [data-selected="true"] {
   background: var(--bar);
 }
-.histogram .bounded {
-  background: repeating-linear-gradient(
-    -45deg,
-    var(--observed),
-    var(--observed) 3px,
-    var(--panel) 4px
-  );
-}
 .axis,
 .bucket-detail {
   display: flex;
@@ -994,4 +986,131 @@ select {
   .range-control summary {
     font-size: 11px;
   }
+}
+
+.histogram {
+  cursor: crosshair;
+  touch-action: pan-y;
+}
+.histogram:focus-visible {
+  outline: 2px solid var(--bar);
+  outline-offset: 3px;
+}
+.histogram .brush-range {
+  position: absolute;
+  inset-block: 0;
+  pointer-events: none;
+  background: color-mix(in srgb, var(--bar) 9%, transparent);
+  border-inline: 1px dashed var(--subtle);
+}
+.histogram .unmeasured {
+  background: repeating-linear-gradient(
+    -45deg,
+    transparent 0 4px,
+    var(--line) 5px 6px
+  );
+}
+.bucket-detail strong,
+.bucket-detail small {
+  display: block;
+  font-variant-numeric: tabular-nums;
+}
+.bucket-detail small {
+  margin-top: 4px;
+}
+.chart-values {
+  margin-top: 10px;
+  font-size: 12px;
+}
+.chart-values summary {
+  cursor: pointer;
+  color: var(--subtle);
+}
+.chart-values .table-scroll {
+  margin-top: 8px;
+  max-height: 250px;
+}
+
+.statement-detail {
+  min-width: 0;
+  max-width: min(72vw, 760px);
+}
+.statement-section {
+  margin: 18px 0;
+  white-space: normal;
+}
+.statement-section h3 {
+  margin: 0 0 6px;
+}
+.statement-section td,
+.statement-section th {
+  white-space: nowrap;
+}
+.statement-section small {
+  display: block;
+}
+.region-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr));
+  gap: 16px;
+}
+.region-card {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.region-card h2 {
+  margin: 4px 0 14px;
+  overflow-wrap: anywhere;
+}
+.region-card header small,
+.region-card dt {
+  color: var(--subtle);
+}
+.region-card dl {
+  margin: 0 0 16px;
+}
+.region-card dl div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  border-top: 1px solid var(--line);
+  padding: 8px 0;
+}
+.region-card dd {
+  font-size: 20px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+.region-card a {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: auto;
+}
+
+.statement-toggle {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  padding: 2px 0;
+  max-width: 100%;
+  appearance: none;
+  background: transparent;
+  border: 0;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+.statement-toggle svg {
+  flex: none;
+}
+.workload .statement-evidence-row > td {
+  max-width: none;
+  background: var(--panel);
+  white-space: normal;
+}
+.statement-detail {
+  max-width: none;
 }

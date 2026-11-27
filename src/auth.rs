@@ -159,8 +159,25 @@ pub async fn session(State(auth): State<Arc<Auth>>, headers: HeaderMap) -> Json<
         .iter()
         .map(|p| json!({"id":p.id,"label":p.label}))
         .collect();
+    let access = auth.access(&headers);
+    let regions: std::collections::BTreeMap<_, _> = auth
+        .config
+        .archives
+        .iter()
+        .filter(|archive| {
+            access
+                .as_ref()
+                .is_some_and(|scope| scope.archives.contains_key(&archive.name))
+        })
+        .filter_map(|archive| {
+            archive
+                .region
+                .as_ref()
+                .map(|region| (&archive.name, region))
+        })
+        .collect();
     Json(json!({
-        "saved_views_enabled":auth.config.metadata_db.is_some(),"access":auth.access(&headers), "providers":providers,
+        "regions":regions, "saved_views_enabled":auth.config.metadata_db.is_some(),"access":access, "providers":providers,
         "read_defaults": {
             "window_page_rows": culprit_core::DEFAULT_WAREHOUSE_WINDOW_PAGE_ROWS,
             "artifact_chunk_chars": culprit_core::MAX_WAREHOUSE_ARTIFACT_CHUNK_CHARS

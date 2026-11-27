@@ -4,7 +4,8 @@ import words from "./en.json";
 export function StateMessage({ error }: { error?: string }) {
   return (
     <div className="notice" role={error ? "alert" : "status"}>
-      {error ? <AlertCircle size={18} /> : <LoaderCircle size={18} />} {error ?? words.loading}
+      {error ? <AlertCircle size={18} /> : <LoaderCircle size={18} />}{" "}
+      {error ?? words.loading}
     </div>
   );
 }
@@ -22,4 +23,11 @@ export function stamp(value: string) {
         hourCycle: "h23",
         timeZone: "UTC",
       }).format(d) + " UTC";
+}
+
+const numberFormat = new Intl.NumberFormat(undefined, {
+  maximumFractionDigits: 1,
+});
+export function quantity(value: number | null) {
+  return value === null ? "—" : numberFormat.format(value);
 }

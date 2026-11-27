@@ -53,7 +53,7 @@ const provider = http.createServer(async (req, res) => {
       return res.end(
         '<form action="/tenant/select"><input type="hidden" name="flow" value="' +
           flow +
-          '"><button name="role" value="DBA">DBA</button><button name="role" value="Viewer">Viewer</button><button name="role" value="Orders team">Orders team</button><button name="role" value="Guest">Guest</button></form>',
+          '"><button name="role" value="DBA">DBA</button><button name="role" value="Viewer">Viewer</button><button name="role" value="Orders team">Orders team</button><button name="role" value="Regional DBA">Regional DBA</button><button name="role" value="Guest">Guest</button></form>',
       );
     }
     case "/tenant/select": {
@@ -125,13 +125,15 @@ await once(provider, "listening");
 issuer = "http://127.0.0.1:" + provider.address().port + "/tenant";
 const secret = join(fixture, "secret");
 await writeFile(secret, "fixture-secret", { mode: 0o600 });
+const regionalArchives = JSON.parse(process.env.CULPRIT_FIXTURE_ARCHIVES || "{}");
 const cfg = {
   public_url: base,
   metadata_db: join(fixture, "workspace.sqlite3"),
-  archives: ["production", "restricted"].map((name) => ({
+  archives: ["production", "restricted", "japan"].map((name, index) => ({
     name,
+    region: ["United States", "Europe", "Japan"][index],
     evidence_config:
-      process.env.CULPRIT_FIXTURE_ARCHIVE || "config/archive.example.json",
+      regionalArchives[name] || "config/archive.example.json",
   })),
   auth: {
     providers: [
@@ -144,6 +146,13 @@ const cfg = {
       },
     ],
     grants: [
+      ...["production", "restricted"].map((archive) => ({
+        provider: "company",
+        archive,
+        claim: "roles",
+        value: "Regional DBA",
+        permissions: ["view_reports", "inspect_evidence"],
+      })),
       {
         provider: "company",
         archive: "production",
