@@ -35,8 +35,13 @@ try {
   assert.ok(resourcePath, "the DBA has a link to the published resource");
   const destination = new URL(resourcePath, page.url());
   assert.equal(destination.origin, new URL(page.url()).origin);
-  assert.equal(destination.searchParams.get("archive"), "production");
-  destination.searchParams.set("view", "incident");
+  const destArchive =
+    destination.searchParams.get("archive") ||
+    decodeURIComponent(destination.pathname.split("/")[2] || "");
+  assert.equal(destArchive, "production");
+  if (!destination.pathname.startsWith("/archives/")) {
+    destination.searchParams.set("view", "incident");
+  }
   const load = page.waitForResponse(
     (response) => response.url().endsWith("/api/archive/incident"),
     { timeout: 60000 },
