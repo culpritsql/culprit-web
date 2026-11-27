@@ -114,5 +114,19 @@
   "remove": "Remove",
   "noSaved": "You have no saved investigations.",
   "exportOriginal": "Export this evidence page",
-  "exportBusy": "Preparing export…"
+  "exportBusy": "Preparing export…",
+  "timeline": "Timeline",
+  "incidentTimeline": "Incident revisions",
+  "timelineClock": "Revisions are ordered by the time Culprit recorded its analysis. Each revision keeps the source observation times.",
+  "inspectRevision": "Inspect revision",
+  "guidance": "Guidance and original evidence",
+  "noMatchingFacts": "No matching findings or changes in this published analysis.",
+  "operations": "Operations",
+  "schema": "Schema and indexes",
+  "from_utc": "From (UTC)",
+  "until": "Until (UTC)",
+  "cutoff": "Published by (UTC)",
+  "invalidRange": "Select a valid time range. The end must follow the start.",
+  "timeSelection": "Time selection",
+  "withinWindow": "For this time window"
 }

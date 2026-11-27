@@ -338,3 +338,52 @@ test("saved investigations preserve their source scope and disappear after the i
     page.getByText("You have no saved investigations."),
   ).toBeVisible();
 });
+
+test("an explicit UTC range stays selected across workload, operational and schema reads", async ({
+  page,
+}) => {
+  await fixture(page);
+  await page.route("**/api/archive/incident", (route) =>
+    route.fulfill({ contentType: "application/json", body: incidentFixture }),
+  );
+  await page.route("**/api/archive/window", (route) => {
+    const query = route.request().postDataJSON().request;
+    if (query.as_of.endsWith(".000Z")) {
+      expect(query.window.from).toBe("2026-11-22T09:57:00.000Z");
+      expect(query.window.until).toBe("2026-11-22T10:05:00.000Z");
+    }
+    return route.fulfill({
+      contentType: "application/json",
+      body: presentationReport("warehouse-windows", query),
+    });
+  });
+  await page.goto("/");
+  await signIn(page, "DBA");
+  await page.getByRole("link", { name: "Orders" }).click();
+  await page.getByRole("link", { name: "Workload", exact: true }).click();
+  await page.locator(".range-control summary").click();
+  await page
+    .getByLabel("From (UTC)", { exact: true })
+    .fill("2026-11-22T09:57:00");
+  await page.getByRole("button", { name: "Open window" }).click();
+  await expect(page).toHaveURL(/asof=/);
+  await expect(
+    page.getByText(
+      "No compatible workload intervals were returned for this window.",
+    ),
+  ).toBeVisible();
+  await page.getByRole("link", { name: "Operations", exact: true }).click();
+  await expect(page.getByText("Historical setting difference")).toBeVisible();
+  await page
+    .getByRole("link", { name: "Schema and indexes", exact: true })
+    .click();
+  await expect(
+    page.getByText(
+      "No matching findings or changes in this published analysis.",
+    ),
+  ).toBeVisible();
+  await page.getByRole("link", { name: "Timeline", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Incident revisions" }),
+  ).toBeVisible();
+});

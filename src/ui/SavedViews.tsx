@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 import { Bookmark as BookmarkIcon, Trash2 } from "lucide-react";
 import { api, useRead, type SavedView } from "./api";
-import { investigationUrl } from "./navigation";
+import { investigationUrl, putRange } from "./navigation";
 import { StateMessage } from "./shared";
 import w from "./en.json";
 
@@ -10,6 +10,7 @@ function href(view: SavedView) {
     investigationUrl(view.connection, view.resource, view.around, view.view),
     location.origin,
   );
+  if (view.bounds) putRange(url.searchParams, view.bounds);
   if (view.incident) url.searchParams.set("incident", view.incident);
   return url.pathname + url.search;
 }

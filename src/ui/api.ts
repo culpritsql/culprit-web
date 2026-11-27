@@ -15,7 +15,11 @@ export type {
   WarehouseFleetRequest,
   PublishedResourceSelector,
 };
-import type { Section } from "./navigation";
+import type { Section, ArchiveRange } from "./navigation";
+export type ArchiveScope = {
+  connection: WarehouseConnectionRef;
+  resource: PublishedResourceSelector;
+};
 export interface SavedView {
   title: string;
   connection: WarehouseConnectionRef;
@@ -23,6 +27,7 @@ export interface SavedView {
   around: string;
   view: Section;
   incident: string | null;
+  bounds?: ArchiveRange | null;
 }
 export type Bookmark = SavedView & { id: number };
 export const ExportAccess = createContext(false);

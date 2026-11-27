@@ -11,7 +11,12 @@ import { SavedViews } from "./SavedViews";
 import { Fleet } from "./Fleet";
 import { Incident } from "./Incident";
 import { StateMessage } from "./shared";
-import { archiveUrl, investigationUrl, activeSection } from "./navigation";
+import {
+  archiveUrl,
+  investigationUrl,
+  activeSection,
+  getRange,
+} from "./navigation";
 import w from "./en.json";
 
 export function mayInspect(
@@ -60,6 +65,9 @@ export function Workspace({
     database: params.get("database") ?? "",
   };
   const investigating = params.has("database");
+  const selectedRange = getRange(params);
+  if (selectedRange === "invalid")
+    return <StateMessage error={w.invalidRange} />;
   const around = params.get("around") ?? "";
   if (
     investigating &&
@@ -113,6 +121,7 @@ export function Workspace({
                     connection,
                     resource,
                     around,
+                    bounds: selectedRange,
                     view: activeSection(params),
                     incident: params.get("incident"),
                   }
@@ -127,6 +136,7 @@ export function Workspace({
           resource={resource}
           around={new Date(around).toISOString()}
           revisionId={params.get("incident")}
+          bounds={selectedRange}
         />
       ) : grant.view_fleet ? (
         <Fleet

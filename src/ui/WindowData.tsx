@@ -72,7 +72,7 @@ export function WindowData({
 }: {
   connection: WarehouseConnectionRef;
   resource: PublishedResourceSelector;
-  report: IncidentReadReport;
+  report: Pick<IncidentReadReport, "from" | "until" | "recorded_before">;
   view: "workload" | "coverage";
 }) {
   const { window_page_rows } = useReadDefaults();

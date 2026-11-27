@@ -1,257 +1,172 @@
 import { useCallback, useState } from "react";
-import { ChevronRight, Clock3, Fingerprint } from "lucide-react";
-import type { DerivedIncident } from "../../vendor/culprit/app/src/gen/DerivedIncident";
-import type { DerivedIncidentQuery } from "../../vendor/culprit/app/src/gen/DerivedIncidentQuery";
-import type { DiagnosticEvidenceRef } from "../../vendor/culprit/app/src/gen/DiagnosticEvidenceRef";
-import type { PublishedResourceSelector } from "../../vendor/culprit/app/src/gen/PublishedResourceSelector";
-import { api, useRead, type WarehouseConnectionRef } from "./api";
-import { Evidence } from "./Evidence";
-import { activeSection, sectionUrl, type Section } from "./navigation";
-import { WindowData } from "./WindowData";
+import type { WarehouseIncidentView } from "../../vendor/culprit/app/src/gen/WarehouseIncidentView";
+import { api, useRead, useReadDefaults, type ArchiveScope } from "./api";
+import {
+  activeSection,
+  sectionUrl,
+  type ArchiveRange,
+  type Section,
+} from "./navigation";
+import { RangeSelection } from "./ArchiveRange";
+import { IncidentCase } from "./IncidentCase";
+import { IncidentTimeline } from "./IncidentTimeline";
 import { PublishedWindow } from "./PublishedWindow";
-import { ObservationTimes } from "./ObservationTimes";
+import { WindowData } from "./WindowData";
 import { StateMessage, stamp } from "./shared";
 import w from "./en.json";
 
-type Archive = {
-  connection: WarehouseConnectionRef;
-  resource: PublishedResourceSelector;
+const tabs: Record<Section, string> = {
+  incident: w.progress,
+  timeline: w.timeline,
+  workload: w.workload,
+  operations: w.operations,
+  schema: w.schema,
+  changes: w.changes,
+  coverage: w.collectionCoverage,
 };
-
-function Queries({
-  title,
-  items,
+function Cases({
+  scope,
+  view,
+  revisionId,
 }: {
-  title: string;
-  items: DerivedIncidentQuery[];
+  scope: ArchiveScope;
+  view: WarehouseIncidentView;
+  revisionId: string | null;
 }) {
-  if (!items.length) return null;
+  const [published, setPublished] = useState(false);
+  const { report } = view;
+  const cases = report.incidents.filter(
+    (item) => !revisionId || item.entry.revision_id === revisionId,
+  );
   return (
-    <section>
-      <h3>{title}</h3>
-      {items.map((query, i) => (
-        <div key={i} className="query">
-          <code>
-            {query.sql.state === "available" ? query.sql.text : w.noPayload}
-          </code>
-          {query.causal_role && <p>{query.causal_role.explanation.text}</p>}
+    <>
+      {!report.discovery_complete && <div className="notice">{w.partial}</div>}
+      {cases.length === 0 && (
+        <div className="panel notice">
+          {revisionId ? w.missingCase : w.none}
         </div>
+      )}
+      {cases.map((item) => (
+        <IncidentCase
+          key={item.analysis_id + item.entry.revision_id}
+          incident={item}
+          {...scope}
+        />
       ))}
-    </section>
+      <button
+        className="button"
+        type="button"
+        aria-expanded={published}
+        onClick={() => setPublished((v) => !v)}
+      >
+        {w.published}
+      </button>
+      {published && <PublishedWindow {...scope} report={report} />}
+      {[
+        ...report.gaps.map((g) => g.kind),
+        ...view.analysis_limitations.flatMap((l) => l.reasons),
+      ].map((reason, i) => (
+        <p className="muted" key={i}>
+          {reason}
+        </p>
+      ))}
+    </>
   );
 }
-
-function Case({
-  incident,
-  connection,
-  resource,
-}: Archive & { incident: DerivedIncident }) {
-  const [selected, setSelected] = useState<DiagnosticEvidenceRef | null>(null);
-  const refs = [
-    incident.revision_reference,
-    ...incident.affected_queries.flatMap((q) => q.evidence),
-    ...incident.culprit_queries.flatMap((q) => q.evidence),
-    ...incident.candidate_queries.flatMap((q) => q.evidence),
-  ];
-  const originals = [
-    ...new Map(refs.map((ref) => [JSON.stringify(ref), ref])).values(),
-  ];
-  const entry = incident.entry;
-  const permalink = new URL(location.href);
-  permalink.searchParams.set("incident", entry.revision_id);
-  return (
-    <article className="panel case">
-      <div className="case-title">
-        <span className="status">
-          <i />
-          {entry.lifecycle}
-        </span>
-        <a href={permalink.pathname + permalink.search}>{w.permalink}</a>
-      </div>
-      <h2>{entry.title}</h2>
-      <p className="lead">{incident.victim_summary}</p>
-      <ObservationTimes
-        first={entry.first_seen_at}
-        last={entry.last_seen_at}
-        recorded={entry.recorded_at}
-      />
-      <div className="case-columns">
-        <div>
-          {incident.mechanism && (
-            <section>
-              <h3>{w.mechanism}</h3>
-              <p>{incident.mechanism}</p>
-            </section>
-          )}
-          <Queries title={w.affected} items={incident.affected_queries} />
-          <Queries title={w.culprit} items={incident.culprit_queries} />
-          <Queries title={w.candidate} items={incident.candidate_queries} />
-          <section>
-            <h3>{w.action}</h3>
-            <p>{incident.developer_action}</p>
-            <h3>{w.verify}</h3>
-            <p>{incident.verification}</p>
-          </section>
-        </div>
-        <aside>
-          <h3>
-            <Fingerprint size={17} /> {w.orig}
-          </h3>
-          <small>
-            {w.at} · {incident.attribution_status}
-          </small>
-          {originals.map((ref, i) => (
-            <button
-              key={i}
-              className="evidence-button"
-              onClick={() => setSelected(ref)}
-            >
-              <span>
-                {ref.stream}
-                <small>{ref.manifest_sha256.slice(0, 16)}…</small>
-              </span>
-              <ChevronRight size={15} />
-            </button>
-          ))}
-          {selected && (
-            <Evidence
-              key={JSON.stringify(selected)}
-              reference={selected}
-              connection={connection}
-              resource={resource}
-            />
-          )}
-        </aside>
-      </div>
-    </article>
-  );
+type Content = {
+  scope: ArchiveScope;
+  section: Section;
+  range: ArchiveRange;
+  view: WarehouseIncidentView | null;
+  revisionId: string | null;
+};
+function ViewContent({ scope, section, range, view, revisionId }: Content) {
+  switch (section) {
+    case "changes":
+    case "operations":
+    case "schema":
+      return <PublishedWindow {...scope} report={range} area={section} />;
+    case "coverage":
+    case "workload":
+      return <WindowData {...scope} report={range} view={section} />;
+    case "timeline":
+      return view && <IncidentTimeline {...scope} report={view.report} />;
+    case "incident":
+      return (
+        view && <Cases scope={scope} view={view} revisionId={revisionId} />
+      );
+  }
 }
-
 export function Incident({
   connection,
   resource,
   around,
   revisionId,
-}: Archive & { around: string; revisionId: string | null }) {
-  const [time, setTime] = useState(around.slice(0, 16));
+  bounds,
+}: ArchiveScope & {
+  around: string;
+  revisionId: string | null;
+  bounds: ArchiveRange | null;
+}) {
+  const section = activeSection(new URLSearchParams(location.search));
+  const { window_page_rows: pageRows } = useReadDefaults();
   const load = useCallback(
-    (signal: AbortSignal) => api.incident(connection, resource, around, signal),
-    [connection, resource, around],
+    async (signal: AbortSignal): Promise<WarehouseIncidentView | null> => {
+      if (!bounds) return api.incident(connection, resource, around, signal);
+      if (section !== "incident" && section !== "timeline") return null;
+      const page = await api.window(
+        connection,
+        {
+          resource,
+          window: { from: bounds.from, until: bounds.until },
+          as_of: bounds.recorded_before,
+          view: "compatible-workload",
+          page_rows: pageRows,
+          after: null,
+        },
+        signal,
+      );
+      return {
+        report: page.incidents,
+        analysis_limitations: page.incident_limitations,
+      };
+    },
+    [connection, resource, around, bounds, section, pageRows],
   );
   const result = useRead(load);
-  const section = activeSection(new URLSearchParams(location.search));
-  const tabs: Record<Section, string> = {
-    incident: w.progress,
-    workload: w.workload,
-    changes: w.changes,
-    coverage: w.collectionCoverage,
-  };
-  const [showWindow, setShowWindow] = useState(false);
-  const report = result.status === "ready" ? result.value.report : null;
-  const cases =
-    report?.incidents.filter(
-      (i) => !revisionId || i.entry.revision_id === revisionId,
-    ) ?? [];
+  const view = result.status === "ready" ? result.value : null;
+  const range = bounds ?? view?.report;
+  const name = view?.report.incidents[0]?.display.database_name;
   return (
     <>
       <header className="page-head">
         <div>
-          <h1>{report?.incidents[0]?.display.database_name ?? w.report}</h1>
+          <h1>{name ?? tabs[section]}</h1>
           <p>
             {w.report} · {stamp(around)}
           </p>
         </div>
+        {range && <RangeSelection range={range} />}
       </header>
-      <form
-        className="window"
-        onSubmit={(e) => {
-          e.preventDefault();
-          const url = new URL(location.href);
-          url.searchParams.delete("incident");
-          url.searchParams.set("around", new Date(time + "Z").toISOString());
-          location.assign(url);
-        }}
-      >
-        <label>
-          <Clock3 size={15} />
-          {w.windowAround}
-          <input
-            type="datetime-local"
-            required
-            value={time}
-            onChange={(e) => setTime(e.target.value)}
-          />
-        </label>
-        <button className="button">{w.apply}</button>
-      </form>
       <nav className="tabs" aria-label={w.resourceViews}>
-        {(Object.entries(tabs) as [Section, string][]).map(([key, title]) => (
+        {(Object.entries(tabs) as [Section, string][]).map(([key, label]) => (
           <a
             key={key}
-            aria-current={section === key ? "page" : undefined}
+            aria-current={key === section ? "page" : undefined}
             href={sectionUrl(key)}
           >
-            {title}
+            {label}
           </a>
         ))}
       </nav>
-      {result.status === "ready" ? (
-        section === "changes" ? (
-          <PublishedWindow
-            connection={connection}
-            resource={resource}
-            report={result.value.report}
-          />
-        ) : section === "workload" || section === "coverage" ? (
-          <WindowData
-            connection={connection}
-            resource={resource}
-            report={result.value.report}
-            view={section}
-          />
-        ) : (
-          <>
-            {!result.value.report.discovery_complete && (
-              <div className="notice">{w.partial}</div>
-            )}
-            {cases.length === 0 && (
-              <div className="panel notice">
-                {revisionId ? w.missingCase : w.none}
-              </div>
-            )}
-            {cases.map((item) => (
-              <Case
-                key={item.analysis_id + item.entry.revision_id}
-                incident={item}
-                connection={connection}
-                resource={resource}
-              />
-            ))}
-            <button
-              className="button"
-              type="button"
-              aria-expanded={showWindow}
-              onClick={() => setShowWindow((open) => !open)}
-            >
-              {w.published}
-            </button>
-            {showWindow && (
-              <PublishedWindow
-                connection={connection}
-                resource={resource}
-                report={result.value.report}
-              />
-            )}
-            {[
-              ...result.value.report.gaps.map((g) => g.kind),
-              ...result.value.analysis_limitations.flatMap((l) => l.reasons),
-            ].map((reason, i) => (
-              <p className="muted" key={i}>
-                {reason}
-              </p>
-            ))}
-          </>
-        )
+      {result.status === "ready" && range ? (
+        <ViewContent
+          scope={{ connection, resource }}
+          section={section}
+          view={view}
+          range={range}
+          revisionId={revisionId}
+        />
       ) : (
         <StateMessage
           error={result.status === "error" ? result.message : undefined}

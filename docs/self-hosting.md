@@ -86,7 +86,7 @@ Run one web replica. It can serve multiple archives. Sessions expire after 15 mi
 
 Set `metadata_db` to a file on a persistent volume writable by the web process. The example uses `/var/lib/culprit-web/workspace.sqlite3`. SQLite holds private saved links and an append-only application audit of signed-in archive read decisions. The `access_audit` table records the verified issuer and subject, UTC Unix time, operation, configured archive, validated resource identifiers and authorization decision. Restrict access to the volume and include it in your backup and retention policy.
 
-A saved view stores the title, archive revision, database selector, time, tab and optional incident revision. The server filters the saved list using the user's current permissions. Share the URL to let another DBA open it under their own identity.
+A saved view stores the title, archive revision, database selector, time, tab, explicit observation window and publication cutoff when selected, and optional incident revision. The server filters the saved list using the user's current permissions. Share the URL to let another DBA open it under their own identity.
 
 Grant `export_evidence` to enable the JSON download in the original-record inspector. The same database must also grant `inspect_evidence`. The download contains the selected archive response, including its page bounds and limitations. The session's existing SQL visibility still applies to the normal inspector.
 

@@ -25,12 +25,32 @@ pub enum View {
     Workload,
     Changes,
     Coverage,
+    Timeline,
+    Operations,
+    Schema,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ArchiveRange {
+    from: String,
+    until: String,
+    recorded_before: String,
+}
+impl ArchiveRange {
+    fn valid(&self) -> bool {
+        let parse = chrono::DateTime::parse_from_rfc3339;
+        matches!((parse(&self.from),parse(&self.until)),(Ok(from),Ok(until)) if from<until)
+            && parse(&self.recorded_before).is_ok()
+    }
 }
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SavedView {
     pub title: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bounds: Option<ArchiveRange>,
     pub connection: WarehouseConnectionRef,
     pub resource: PublishedResourceSelector,
     pub around: String,
@@ -41,6 +61,7 @@ impl SavedView {
     pub fn valid(&self) -> bool {
         !self.title.trim().is_empty()
             && self.title.chars().count() <= 120
+            && self.bounds.as_ref().is_none_or(ArchiveRange::valid)
             && self.resource.validate().is_ok()
             && self.connection.name.len() <= 256
             && self.connection.revision.len() <= 128
