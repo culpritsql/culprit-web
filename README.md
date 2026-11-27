@@ -6,11 +6,11 @@
 
 **Self-hosted database fleet command center, archive time-machine, and MCP server for SQL Server, PostgreSQL, and MySQL.**
 
-[![Checks](https://img.shields.io/github/actions/workflow/status/culpritsql/culprit-fleet/check.yml?branch=main&style=flat-square&label=checks&labelColor=181715)](https://github.com/culpritsql/culprit-fleet/actions/workflows/check.yml)
-[![GHCR & Helm](https://img.shields.io/github/actions/workflow/status/culpritsql/culprit-fleet/publish.yml?branch=main&style=flat-square&label=ghcr%20%26%20helm&labelColor=181715)](https://github.com/culpritsql/culprit-fleet/actions/workflows/publish.yml)
-[![Live Demo](https://img.shields.io/github/actions/workflow/status/culpritsql/culprit-fleet/pages.yml?branch=main&style=flat-square&label=live%20demo&labelColor=181715)](https://culpritsql.github.io/culprit-fleet/)
-[![Collector](https://img.shields.io/badge/collector-culprit--sql--studio-ffcf33?style=flat-square&labelColor=181715)](https://github.com/culpritsql/culprit-sql-studio)
-[![License: MIT](https://img.shields.io/badge/license-MIT-6b93f0?style=flat-square&labelColor=181715)](LICENSE)
+[![Checks](https://github.com/culpritsql/culprit-fleet/actions/workflows/check.yml/badge.svg?branch=main)](https://github.com/culpritsql/culprit-fleet/actions/workflows/check.yml)
+[![GHCR & Helm](https://github.com/culpritsql/culprit-fleet/actions/workflows/publish.yml/badge.svg?branch=main)](https://github.com/culpritsql/culprit-fleet/actions/workflows/publish.yml)
+[![Live Demo](https://github.com/culpritsql/culprit-fleet/actions/workflows/pages.yml/badge.svg?branch=main)](https://culpritsql.github.io/culprit-fleet/)
+[![Collector](https://img.shields.io/badge/collector-culprit--sql--studio-ffcf33)](https://github.com/culpritsql/culprit-sql-studio)
+[![License: MIT](https://img.shields.io/badge/license-MIT-6b93f0)](LICENSE)
 
 [Architecture](#architecture) · [1. Collector](#1-deploy-the-collector) · [2. Deploy Fleet](#2-deploy-culprit-fleet) · [3. MCP for Agents](#3-connect-coding-agents-mcp) · [Live Demo](https://culpritsql.github.io/culprit-fleet/) · [Self-Hosting Guide](docs/self-hosting.md)
 

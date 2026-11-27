@@ -1,4 +1,4 @@
-name: Fleet OCI & Helm Publish
+name: GHCR & Helm
 
 # Builds UI bundle + native x86_64 and ARM64 binaries, smoke-tests Helm & entrypoints, and publishes:
 #   - Multi-arch OCI image: ghcr.io/culpritsql/culprit-fleet (linux/amd64, linux/arm64)
