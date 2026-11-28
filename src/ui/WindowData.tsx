@@ -14,7 +14,7 @@ import { useLiveTick } from "./livePulse";
 import { ResourcesView } from "./ResourcesView";
 import { StateMessage, humanizeGap, stamp } from "./shared";
 import { Workload } from "./Workload";
-import w from "./en.json";
+import { w } from "./i18n";
 
 export function Coverage({
   originals,

@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from "react";
 import { Clock3 } from "lucide-react";
+import { useLocale, w } from "./i18n";
 
 export type ClockZone = "utc" | "local";
 
@@ -57,6 +58,7 @@ export function localZoneLabel(): string {
 }
 
 export function ClockToggle() {
+  useLocale();
   const zone = useClockZone();
   const next: ClockZone = zone === "utc" ? "local" : "utc";
   const abbr = zone === "utc" ? "UTC" : localZoneLabel();
@@ -65,7 +67,7 @@ export function ClockToggle() {
     <button
       type="button"
       className={`top-pill clock-pill ${zone === "local" ? "clock-pill-local" : ""}`}
-      aria-label="Toggle display timezone"
+      aria-label={w.toggleTimezone}
       title={
         zone === "utc"
           ? `Showing UTC timestamps — click to switch to local time (${localZoneLabel()})`

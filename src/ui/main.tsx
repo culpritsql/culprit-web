@@ -24,8 +24,8 @@ import { McpButton } from "./McpModal";
 import { ErrorBoundary } from "./ErrorBoundary";
 import { Workspace } from "./Workspace";
 import { StateMessage } from "./shared";
+import { FleetFooter, LanguagePicker, useLocale, w } from "./i18n";
 import logo from "../../vendor/culprit/docs/images/logo.svg";
-import w from "./en.json";
 import "@fontsource-variable/inter";
 import "./style.css";
 
@@ -39,6 +39,7 @@ function loginUrl(provider: string) {
 }
 
 function DemoTourMenu() {
+  useLocale();
   const [open, setOpen] = useState(false);
   const [scenarios, setScenarios] = useState<PaletteDemoScenario[]>([]);
   const ref = useRef<HTMLDivElement>(null);
@@ -75,7 +76,7 @@ function DemoTourMenu() {
         onClick={() => setOpen((v) => !v)}
       >
         <Sparkles size={14} />
-        <span className="top-pill-label">Interactive Demo</span>
+        <span className="top-pill-label">{w.interactiveDemo}</span>
       </button>
       {open && (
         <div
@@ -85,7 +86,7 @@ function DemoTourMenu() {
         >
           <div className="theme-popover-head">
             <Compass size={14} />
-            <span>Guided showcase scenarios</span>
+            <span>{w.guidedScenarios}</span>
           </div>
           <div className="theme-list">
             {scenarios.map((sc) => (
@@ -113,6 +114,7 @@ function DemoTourMenu() {
 }
 
 function App() {
+  useLocale();
   useLocationHref();
   useClockZone();
   const parsed = parseRoute();
@@ -171,16 +173,17 @@ function App() {
                 type="button"
                 className="top-pill"
                 aria-label={w.commandPalette}
-                title="Quick jump (⌘K)"
+                title={w.quickJumpTitle}
                 onClick={() =>
                   window.dispatchEvent(new Event("open-command-palette"))
                 }
               >
                 <Search size={14} />
-                <span className="top-pill-label">Jump</span>
+                <span className="top-pill-label">{w.jump}</span>
                 <kbd aria-hidden="true">⌘K</kbd>
               </button>
             )}
+            <LanguagePicker />
             <ThemePicker />
             {access && !demo && (
               <form action="/auth/logout" method="post">
@@ -229,6 +232,7 @@ function App() {
           </section>
         )}
       </main>
+      <FleetFooter />
     </>
   );
 }

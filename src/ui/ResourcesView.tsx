@@ -17,7 +17,7 @@ import type { WarehouseWindowReport } from "../../vendor/culprit/app/src/gen/War
 import type { BlockNode } from "../../vendor/culprit/app/src/gen/BlockNode";
 import { pct, quantity, shortTime, stamp, waitTone } from "./shared";
 import { useTheme } from "./themes";
-import w from "./en.json";
+import { w } from "./i18n";
 
 const LazyDeadlockViewer = lazy(async () => {
   const [mod] = await Promise.all([

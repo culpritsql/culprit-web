@@ -23,7 +23,7 @@ import {
 import { PublishedAnalysis, type PublishedArea } from "./PublishedAnalysis";
 import { SchemaExplorer } from "./SchemaExplorer";
 import { StateMessage, humanizeGap, stamp } from "./shared";
-import w from "./en.json";
+import { w } from "./i18n";
 
 const schemaChanges = new Set<EventKind>([
   "index",

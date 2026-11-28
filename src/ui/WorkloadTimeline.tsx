@@ -2,7 +2,7 @@ import { useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 import type { Timeline } from "../../vendor/culprit/app/src/gen/Timeline";
 import { rangeUrl, spaClick, type ArchiveRange } from "./navigation";
 import { stamp } from "./shared";
-import w from "./en.json";
+import { w } from "./i18n";
 
 const amount = new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 });
 const utcTime = new Intl.DateTimeFormat(undefined, {

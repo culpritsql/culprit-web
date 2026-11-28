@@ -10,7 +10,7 @@ import {
   type WarehouseConnectionRef,
   type WarehouseFleetRequest,
 } from "../../vendor/culprit/packages/culprit-archive-client/src";
-import words from "./en.json";
+import { getLocaleSpec, w as words } from "./i18n";
 export type {
   Plan,
   PlanDiff,
@@ -111,10 +111,16 @@ async function request<T>(
     if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
     return mod.demoRequest<T>(method, path, body);
   }
+  const headers: Record<string, string> = {
+    "X-Culprit-Lang": getLocaleSpec().bcp47,
+  };
+  if (body !== undefined) {
+    headers["Content-Type"] = "application/json";
+  }
   const response = await fetch(path, {
     method,
     signal,
-    headers: body === undefined ? {} : { "Content-Type": "application/json" },
+    headers,
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   if (!response.ok) {

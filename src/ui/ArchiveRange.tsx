@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { ChevronDown, Clock3 } from "lucide-react";
 import { shortTime, stamp } from "./shared";
 import { navigate, rangeUrl, type ArchiveRange } from "./navigation";
-import w from "./en.json";
+import { w } from "./i18n";
 
 function inputTime(iso: string) {
   return new Date(iso).toISOString().replace(/Z$/, "");

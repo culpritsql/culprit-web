@@ -13,7 +13,7 @@ import type { DiagnosticEvidenceRef } from "../../vendor/culprit/app/src/gen/Dia
 import type { PublishedResourceSelector, WarehouseConnectionRef } from "./api";
 import { Evidence } from "./Evidence";
 import { stamp } from "./shared";
-import w from "./en.json";
+import { w } from "./i18n";
 
 type EventFilter = "all" | "revision" | "change" | "deadlock";
 

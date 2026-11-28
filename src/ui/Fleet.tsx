@@ -41,7 +41,7 @@ import {
   stamp,
   waitTone,
 } from "./shared";
-import w from "./en.json";
+import { useLocale, w } from "./i18n";
 
 type SortMode = "attention" | "resource" | "utilization" | "incidents";
 
@@ -54,6 +54,7 @@ export function Fleet({
   canInspect: (resource: PublishedResourceSelector) => boolean;
   onRowsLoaded?: (rows: WarehouseFleetRow[]) => void;
 }) {
+  useLocale();
   const liveTick = useLiveTick();
   const sampleEstate = isSampleEstate(connection);
   const [asOf, setAsOf] = useState(() => fleetNowIso(connection));
@@ -411,7 +412,7 @@ export function Fleet({
                     onClick={() => setGroupByPool((v) => !v)}
                   >
                     <FolderGit2 size={13} />
-                    Group by pool / cluster
+                    {w.groupByPool}
                   </button>
                 )}
                 <SelectMenu<SortMode>
@@ -425,23 +426,23 @@ export function Fleet({
                   options={[
                     {
                       value: "attention",
-                      label: "Attention priority",
-                      detail: "Incidents, high findings & stale targets first",
+                      label: w.sortAttention,
+                      detail: w.sortAttentionDetail,
                     },
                     {
                       value: "utilization",
-                      label: "CPU / Memory pressure",
-                      detail: "Highest resource saturation first",
+                      label: w.sortUtilization,
+                      detail: w.sortUtilizationDetail,
                     },
                     {
                       value: "incidents",
-                      label: "Active incidents",
-                      detail: "Most active incidents & findings first",
+                      label: w.sortIncidents,
+                      detail: w.sortIncidentsDetail,
                     },
                     {
                       value: "resource",
-                      label: "Database name",
-                      detail: "Alphabetical A → Z",
+                      label: w.sortResource,
+                      detail: w.sortResourceDetail,
                     },
                   ]}
                 />

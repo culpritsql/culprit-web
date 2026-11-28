@@ -4,6 +4,7 @@ import {
   Command,
   Database,
   Globe2,
+  Languages,
   Layers3,
   Palette,
   Search,
@@ -19,6 +20,7 @@ import {
   type Section,
 } from "./navigation";
 import { THEMES, setThemeChoice } from "./themes";
+import { LOCALES, setLocale, useLocale, w } from "./i18n";
 import type { Engine } from "../../vendor/culprit/app/src/gen/Engine";
 import type { WarehouseFleetRow } from "../../vendor/culprit/app/src/gen/WarehouseFleetRow";
 import type { WarehouseConnectionRef, PublishedResourceSelector } from "./api";
@@ -54,14 +56,6 @@ interface Item {
   run: () => void;
 }
 
-const SECTION_ITEMS: { key: Section; label: string }[] = [
-  { key: "incident", label: "Triage" },
-  { key: "resources", label: "Resources & waits" },
-  { key: "workload", label: "Workload & Top SQL" },
-  { key: "schema", label: "Schema & advisors" },
-  { key: "timeline", label: "Timeline & coverage" },
-];
-
 export function CommandPalette({
   connections,
   regions,
@@ -75,6 +69,7 @@ export function CommandPalette({
   investigating: boolean;
   demoScenarios?: PaletteDemoScenario[];
 }) {
+  const locale = useLocale();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
@@ -107,11 +102,19 @@ export function CommandPalette({
   }, [open]);
 
   const items = useMemo<Item[]>(() => {
+    void locale;
+    const sectionItems: { key: Section; label: string }[] = [
+      { key: "incident", label: w.progress },
+      { key: "resources", label: w.resourcesTab },
+      { key: "workload", label: w.workloadTopSql },
+      { key: "schema", label: w.schema },
+      { key: "timeline", label: w.timeline },
+    ];
     const list: Item[] = [];
     for (const demo of demoScenarios) {
       list.push({
         id: "demo:" + demo.label,
-        group: "Showcase scenarios",
+        group: w.showcaseScenarios,
         label: demo.label,
         detail: demo.detail,
         icon: Sparkles,
@@ -121,9 +124,9 @@ export function CommandPalette({
     if (connections.length > 1) {
       list.push({
         id: "nav:regions",
-        group: "Navigation",
-        label: "Regional fleets overview",
-        detail: `${connections.length} archives`,
+        group: w.navigation,
+        label: w.regionalFleetsOverview,
+        detail: `${connections.length} ${w.archive.toLowerCase()}`,
         icon: Globe2,
         run: () => navigate(regionsUrl()),
       });
@@ -131,9 +134,11 @@ export function CommandPalette({
     for (const conn of connections) {
       list.push({
         id: "archive:" + conn.name,
-        group: "Archives",
+        group: w.archive,
         label: conn.name,
-        detail: regions[conn.name] ? `${regions[conn.name]} · Open fleet` : "Open fleet",
+        detail: regions[conn.name]
+          ? `${regions[conn.name]} · ${w.openFleet}`
+          : w.openFleet,
         icon: Layers3,
         run: () => navigate(archiveUrl(conn.name)),
       });
@@ -141,7 +146,7 @@ export function CommandPalette({
     for (const db of knownResources) {
       list.push({
         id: `db:${db.archive.name}:${db.selector.database}`,
-        group: "Databases",
+        group: w.databasesGroup,
         label: db.name,
         detail: [db.engine.toUpperCase(), db.environment, db.archive.name]
           .filter(Boolean)
@@ -154,11 +159,11 @@ export function CommandPalette({
       });
     }
     if (investigating) {
-      for (const sec of SECTION_ITEMS) {
+      for (const sec of sectionItems) {
         list.push({
           id: "sec:" + sec.key,
-          group: "Current database views",
-          label: `Switch to ${sec.label}`,
+          group: w.currentDbViews,
+          label: sec.label,
           icon: Activity,
           run: () => navigate(sectionUrl(sec.key)),
         });
@@ -167,11 +172,21 @@ export function CommandPalette({
     for (const theme of THEMES) {
       list.push({
         id: "theme:" + theme.id,
-        group: "Appearance",
-        label: `Theme: ${theme.label}`,
+        group: w.appearanceGroup,
+        label: `${w.theme}: ${theme.label}`,
         detail: theme.tagline,
         icon: Palette,
         run: () => setThemeChoice(theme.id),
+      });
+    }
+    for (const loc of LOCALES) {
+      list.push({
+        id: "lang:" + loc.code,
+        group: w.language,
+        label: `${w.language}: ${loc.nativeName}`,
+        detail: loc.englishName,
+        icon: Languages,
+        run: () => setLocale(loc.code),
       });
     }
     const q = query.trim().toLowerCase();
@@ -182,7 +197,15 @@ export function CommandPalette({
         item.group.toLowerCase().includes(q) ||
         (item.detail?.toLowerCase().includes(q) ?? false),
     );
-  }, [connections, regions, knownResources, investigating, demoScenarios, query]);
+  }, [
+    connections,
+    regions,
+    knownResources,
+    investigating,
+    demoScenarios,
+    query,
+    locale,
+  ]);
 
   if (!open) return null;
 
@@ -206,7 +229,7 @@ export function CommandPalette({
           <input
             ref={inputRef}
             value={query}
-            placeholder="Jump to database, region, view or theme…"
+            placeholder={w.searchJumpPlaceholder}
             aria-label="Jump to database, region, view or theme"
             onChange={(e) => {
               setQuery(e.target.value);
@@ -237,7 +260,7 @@ export function CommandPalette({
         </div>
         <div className="palette-results">
           {items.length === 0 ? (
-            <p className="palette-empty">No matching destinations.</p>
+            <p className="palette-empty">{w.noPaletteMatches}</p>
           ) : (
             items.map((item, index) => {
               const Icon = item.icon;

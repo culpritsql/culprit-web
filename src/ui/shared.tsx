@@ -1,6 +1,6 @@
 import { AlertCircle, LoaderCircle } from "lucide-react";
 import { getClockZone } from "./clock";
-import words from "./en.json";
+import { w as words } from "./i18n";
 
 export function StateMessage({ error }: { error?: string }) {
   return (

@@ -30,7 +30,7 @@ import { sectionUrl, spaClick } from "./navigation";
 import { ObservationTimes } from "./ObservationTimes";
 import { QueryInspectorDrawer } from "./QueryInspectorDrawer";
 import { formatDurationMs, relativeAge, stamp } from "./shared";
-import w from "./en.json";
+import { w } from "./i18n";
 
 const LazySql = lazy(async () => {
   const [mod] = await Promise.all([

@@ -2,7 +2,7 @@ import { useContext, useEffect, useRef, useState } from "react";
 import { Download } from "lucide-react";
 import type { WarehouseArtifactQuery } from "../../vendor/culprit/app/src/gen/WarehouseArtifactQuery";
 import { api, ExportAccess, type WarehouseConnectionRef } from "./api";
-import w from "./en.json";
+import { w } from "./i18n";
 
 export function ExportEvidence({
   connection,

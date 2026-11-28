@@ -3,7 +3,7 @@ import { Bookmark as BookmarkIcon, ChevronDown, Trash2 } from "lucide-react";
 import { api, useRead, type SavedView } from "./api";
 import { investigationUrl, putRange, spaClick } from "./navigation";
 import { StateMessage } from "./shared";
-import w from "./en.json";
+import { w } from "./i18n";
 
 function href(view: SavedView) {
   const url = new URL(

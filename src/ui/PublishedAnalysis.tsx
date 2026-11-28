@@ -19,7 +19,7 @@ import type { DiagnosticEvidenceRef } from "../../vendor/culprit/app/src/gen/Dia
 import type { PublishedResourceSelector, WarehouseConnectionRef } from "./api";
 import { Evidence } from "./Evidence";
 import { pct, quantity, stamp } from "./shared";
-import w from "./en.json";
+import { w } from "./i18n";
 
 const LazySql = lazy(async () => {
   const [mod] = await Promise.all([

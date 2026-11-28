@@ -31,7 +31,7 @@ import { fleetRequest } from "./fleetRequest";
 import { useLiveTick } from "./livePulse";
 import { archiveUrl, investigationUrl, spaClick } from "./navigation";
 import { MicroMeter, relativeAge, stamp, waitTone } from "./shared";
-import w from "./en.json";
+import { useLocale, w } from "./i18n";
 
 const PAGE_SIZE = 12;
 type Horizon = "24h" | "7d" | "30d";
@@ -239,6 +239,7 @@ export function RegionalFleet({
   connections: WarehouseConnectionRef[];
   regions: Record<string, string>;
 }) {
+  useLocale();
   const liveTick = useLiveTick();
   const [page, setPage] = useState(0);
   const [horizon, setHorizon] = useState<Horizon>("24h");

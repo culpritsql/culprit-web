@@ -1,5 +1,5 @@
 import { formatDurationMs, relativeAge, stamp } from "./shared";
-import w from "./en.json";
+import { w } from "./i18n";
 
 export function ObservationTimes({
   first,

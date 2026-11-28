@@ -13,7 +13,7 @@ import {
 import { WorkloadTimeline } from "./WorkloadTimeline";
 import { QueryInspectorDrawer } from "./QueryInspectorDrawer";
 import { humanizeGap, pct, quantity, stamp, waitTone } from "./shared";
-import w from "./en.json";
+import { useLocale, w } from "./i18n";
 
 type Metric =
   | "total_time_ms"
@@ -21,14 +21,6 @@ type Metric =
   | "logical_reads"
   | "mean_time_ms"
   | "executions";
-
-const metrics: Record<Metric, string> = {
-  total_time_ms: w.totalTime,
-  cpu_time_ms: w.cpuTime,
-  logical_reads: w.logicalReads,
-  mean_time_ms: w.meanTime,
-  executions: w.calls,
-};
 
 function valOf(q: QueryStat, m: Metric): number {
   return q[m] ?? 0;
@@ -138,6 +130,14 @@ function Population({
   section: CollectedWindowSection;
   range: ArchiveRange;
 }) {
+  useLocale();
+  const metrics: Record<Metric, string> = {
+    total_time_ms: w.totalTime,
+    cpu_time_ms: w.cpuTime,
+    logical_reads: w.logicalReads,
+    mean_time_ms: w.meanTime,
+    executions: w.calls,
+  };
   const [metric, setMetric] = useState<Metric>("total_time_ms");
   const [search, setSearch] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);

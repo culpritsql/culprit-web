@@ -1,6 +1,7 @@
 import { useEffect, useSyncExternalStore } from "react";
 import { Pause, Radio } from "lucide-react";
 import { isDemoMode } from "./api";
+import { useLocale, w } from "./i18n";
 
 const isAutomated =
   typeof navigator !== "undefined" && Boolean(navigator.webdriver);
@@ -59,6 +60,7 @@ export function setLiveEnabled(next: boolean) {
 }
 
 export function LivePulseToggle() {
+  useLocale();
   const enabled = useLiveEnabled();
   const demo = isDemoMode();
 
@@ -92,7 +94,7 @@ export function LivePulseToggle() {
       )}
       {!enabled && <Radio size={12} className="live-radio-idle" />}
       <span className="top-pill-label">
-        {enabled ? (demo ? "Live" : "Live · 15s") : "Live off"}
+        {enabled ? (demo ? w.live : w.live15s) : w.liveOff}
       </span>
     </button>
   );

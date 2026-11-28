@@ -30,7 +30,7 @@ import {
   spaClick,
   useLocationHref,
 } from "./navigation";
-import w from "./en.json";
+import { w } from "./i18n";
 
 export function mayInspect(
   access: ArchiveAccess,

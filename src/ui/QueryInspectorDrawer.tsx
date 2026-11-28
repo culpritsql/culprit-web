@@ -26,7 +26,7 @@ import type { QueryStat } from "../../vendor/culprit/app/src/gen/QueryStat";
 import { api, useRead } from "./api";
 import { pct, quantity, stamp, waitTone } from "./shared";
 import { useTheme } from "./themes";
-import w from "./en.json";
+import { w } from "./i18n";
 
 const LazySql = lazy(async () => {
   const [mod] = await Promise.all([

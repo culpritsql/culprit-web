@@ -44,7 +44,7 @@ import {
   relativeAge,
   stamp,
 } from "./shared";
-import w from "./en.json";
+import { useLocale, w } from "./i18n";
 
 export interface PoolSiblingMeta {
   name: string;
@@ -69,14 +69,6 @@ export interface KnownDatabaseMeta {
   poolSiblings?: PoolSiblingMeta[];
 }
 
-const tabs: Record<Section, string> = {
-  incident: w.progress,
-  resources: w.resourcesTab,
-  workload: w.workload,
-  schema: w.schema,
-  timeline: w.timeline,
-};
-
 function SituationBanner({
   view,
   windowReport,
@@ -86,6 +78,7 @@ function SituationBanner({
   windowReport: WarehouseWindowReport | null;
   knownMeta?: KnownDatabaseMeta | null;
 }) {
+  useLocale();
   const { report } = view;
   const incidents = report.incidents;
   const activeCases = incidents.filter((i) => i.entry.lifecycle === "active");
@@ -152,7 +145,7 @@ function SituationBanner({
         <div className="situation-main">
           <span className="situation-pill pill-ongoing">
             <Radio size={13} />
-            ONGOING INCIDENT
+            {w.ongoingIncident}
           </span>
           <div className="situation-copy">
             <strong>
@@ -210,7 +203,7 @@ function SituationBanner({
         <div className="situation-main">
           <span className="situation-pill pill-recovered">
             <CheckCircle2 size={13} />
-            RECOVERED · ROOT CAUSE RETAINED
+            {w.recoveredRetained}
           </span>
           <div className="situation-copy">
             <strong>
@@ -630,6 +623,14 @@ export function Incident({
   }, [dbScopeKey, view, windowReport]);
 
   const badges = cachedBadges?.key === dbScopeKey ? cachedBadges.badges : {};
+  useLocale();
+  const tabs: Record<Section, string> = {
+    incident: w.progress,
+    resources: w.resourcesTab,
+    workload: w.workload,
+    schema: w.schema,
+    timeline: w.timeline,
+  };
 
   const firstDisplay = view?.report.incidents[0]?.display;
   const dbTitle =

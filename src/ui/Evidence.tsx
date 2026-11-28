@@ -11,7 +11,7 @@ import {
 import { ExportEvidence } from "./ExportEvidence";
 import { CapturedPlan } from "./CapturedPlan";
 import { StateMessage, stamp } from "./shared";
-import w from "./en.json";
+import { w } from "./i18n";
 type Archive = {
   connection: WarehouseConnectionRef;
   resource: PublishedResourceSelector;

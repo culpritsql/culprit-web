@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import type { WarehouseConnectionRef } from "./api";
 import { archiveUrl, navigate, regionsUrl, spaClick } from "./navigation";
-import w from "./en.json";
+import { useLocale, w } from "./i18n";
 
 export interface SelectOption<V extends string> {
   value: V;
@@ -120,6 +120,7 @@ export function ArchiveScaleSwitcher({
   regions: Record<string, string>;
   showRegionsLink: boolean;
 }) {
+  useLocale();
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState("");
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -207,7 +208,7 @@ export function ArchiveScaleSwitcher({
           <div className="scale-popover-head">
             <span>
               <Globe2 size={13} />
-              Scale units &amp; archives
+              {w.scaleUnitsArchives}
             </span>
             <span className="scale-count">{connections.length}</span>
           </div>

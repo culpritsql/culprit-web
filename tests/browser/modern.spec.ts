@@ -292,3 +292,74 @@ test("browser-only static demo mode runs with zero backend API requests", async 
 
   expect(apiHits).toEqual([]);
 });
+
+test("all 9 languages and ecosystem MIT footer work end to end", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 820 });
+  await page.goto("http://127.0.0.1:4391/");
+
+  const footer = page.locator("footer.fleet-footer");
+  await expect(footer).toBeVisible();
+  await expect(footer.getByText("Free & Open Source · MIT License")).toBeVisible();
+  await expect(
+    footer.getByRole("link", { name: "Culprit SQL", exact: true }),
+  ).toHaveAttribute("href", "https://culpritsql.com/");
+  await expect(footer.getByRole("link", { name: "Explain" })).toHaveAttribute(
+    "href",
+    "https://explain.culpritsql.com/",
+  );
+  await expect(footer.getByRole("link", { name: "GitHub" })).toHaveAttribute(
+    "href",
+    "https://github.com/culpritsql/culprit-fleet",
+  );
+
+  // Switch through Chinese, Russian, Japanese, Korean and back to English
+  await page.getByRole("button", { name: "Language" }).click();
+  const langDialog = page.getByRole("dialog", { name: "Interface language" });
+  await expect(langDialog.locator("button.theme-option")).toHaveCount(9);
+  await langDialog.getByRole("button", { name: /简体中文/ }).click();
+  await expect(page.locator("html")).toHaveAttribute("lang", "zh-Hans");
+  await expect(page.getByText("归档工作区")).toBeVisible();
+  await expect(footer.getByText("免费且开源 · MIT 许可证")).toBeVisible();
+  await expect(footer.getByRole("link", { name: "Explain" })).toHaveAttribute(
+    "href",
+    "https://explain.culpritsql.com/zh/",
+  );
+
+  await page.getByRole("button", { name: "语言" }).click();
+  await page
+    .getByRole("dialog", { name: "界面语言" })
+    .getByRole("button", { name: /Русский/ })
+    .click();
+  await expect(page.locator("html")).toHaveAttribute("lang", "ru");
+  await expect(page.getByText("Рабочая область архива")).toBeVisible();
+  await expect(
+    footer.getByText("Бесплатно и с открытым исходным кодом · Лицензия MIT"),
+  ).toBeVisible();
+
+  // Footer quick-switch bar switches to Japanese, Korean, German, Spanish, French, Portuguese, and English
+  await footer.getByRole("button", { name: "日本語" }).click();
+  await expect(page.locator("html")).toHaveAttribute("lang", "ja");
+  await expect(page.getByText("アーカイブワークスペース")).toBeVisible();
+
+  await footer.getByRole("button", { name: "한국어" }).click();
+  await expect(page.locator("html")).toHaveAttribute("lang", "ko");
+  await expect(page.getByText("아카이브 워크스페이스")).toBeVisible();
+
+  await footer.getByRole("button", { name: "Deutsch" }).click();
+  await expect(page.locator("html")).toHaveAttribute("lang", "de");
+
+  await footer.getByRole("button", { name: "Español" }).click();
+  await expect(page.locator("html")).toHaveAttribute("lang", "es");
+
+  await footer.getByRole("button", { name: "Français" }).click();
+  await expect(page.locator("html")).toHaveAttribute("lang", "fr");
+
+  await footer.getByRole("button", { name: "Português" }).click();
+  await expect(page.locator("html")).toHaveAttribute("lang", "pt-BR");
+
+  await footer.getByRole("button", { name: "English" }).click();
+  await expect(page.locator("html")).toHaveAttribute("lang", "en");
+  await expect(page.getByText("Archive workspace")).toBeVisible();
+});

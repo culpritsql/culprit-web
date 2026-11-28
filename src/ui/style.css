@@ -6421,3 +6421,251 @@ button.corr-event-diamond:hover {
     justify-content: space-between;
   }
 }
+
+/* =========================================================================
+   9-Language Picker & Ecosystem Open-Source Footer
+   ========================================================================= */
+
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+main {
+  flex: 1 0 auto;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.lang-popover {
+  width: min(272px, 90vw);
+  max-height: min(72vh, 460px);
+  overflow-y: auto;
+}
+
+.lang-code-badge {
+  width: 30px;
+  height: 22px;
+  border-radius: 5px;
+  border: 1px solid var(--line);
+  background: var(--muted);
+  color: var(--subtle);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+
+.theme-option[data-selected="true"] .lang-code-badge {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.fleet-footer {
+  margin-top: 44px;
+  border-top: 1px solid var(--line);
+  background: color-mix(in srgb, var(--panel) 78%, var(--bg));
+  color: var(--subtle);
+}
+
+.fleet-footer-inner {
+  width: min(1320px, 94vw);
+  margin: 0 auto;
+  padding: 24px 0 26px;
+  display: grid;
+  gap: 18px;
+}
+
+.fleet-footer-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.fleet-footer-brand-col {
+  display: grid;
+  gap: 8px;
+  max-width: 560px;
+}
+
+.fleet-footer-brand-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.fleet-footer-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  color: var(--ink);
+  font-size: 14px;
+  letter-spacing: -0.02em;
+}
+
+.fleet-footer-brand img {
+  width: 20px;
+  height: 20px;
+}
+
+.fleet-footer-surface {
+  font-size: 10.5px;
+  font-weight: 640;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--muted);
+  border: 1px solid var(--line);
+  color: var(--subtle);
+}
+
+.fleet-footer-mit-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  text-decoration: none;
+  color: var(--green);
+  background: var(--soft);
+  border: 1px solid color-mix(in srgb, var(--green) 28%, var(--line));
+  transition: border-color 120ms ease;
+}
+
+.fleet-footer-mit-pill:hover {
+  border-color: var(--green);
+}
+
+.fleet-footer-tagline {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--subtle);
+}
+
+.fleet-footer-links {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+}
+
+.fleet-footer-links a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12.5px;
+  font-weight: 540;
+  color: var(--ink);
+  text-decoration: none;
+  padding: 3px 0;
+  opacity: 0.88;
+  transition: color 120ms ease, opacity 120ms ease;
+}
+
+.fleet-footer-links a svg {
+  color: var(--subtle);
+  opacity: 0.75;
+}
+
+.fleet-footer-links a:hover {
+  color: var(--accent);
+  opacity: 1;
+}
+
+.fleet-footer-links a:hover svg {
+  color: var(--accent);
+  opacity: 1;
+}
+
+.fleet-footer-bottom {
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.fleet-footer-langs {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.fleet-footer-lang-btn {
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--subtle);
+  font-size: 11.5px;
+  font-weight: 520;
+  padding: 3px 8px;
+  border-radius: 6px;
+  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+
+.fleet-footer-lang-btn:hover {
+  color: var(--ink);
+  background: var(--muted);
+}
+
+.fleet-footer-lang-btn[aria-pressed="true"] {
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 32%, transparent);
+  font-weight: 620;
+}
+
+.fleet-footer-copy {
+  font-size: 11.5px;
+  color: var(--subtle);
+  white-space: nowrap;
+}
+
+@media (max-width: 860px) {
+  .lang-picker .top-pill-label {
+    display: none;
+  }
+}
+
+@media (max-width: 520px) {
+  .brand {
+    font-size: 17px;
+    gap: 6px;
+  }
+  .brand img {
+    width: 22px;
+    height: 22px;
+  }
+  .top-inner {
+    gap: 4px;
+  }
+  .top-controls {
+    gap: 3px;
+  }
+  .top-pill {
+    padding: 5px 6px;
+    gap: 3px;
+  }
+  .clock-pill-code {
+    font-size: 10.5px;
+  }
+  .top-icon-btn {
+    padding: 5px 6px !important;
+  }
+}

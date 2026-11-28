@@ -6,7 +6,7 @@ import {
 import type { WarehouseFleetRow } from "../../vendor/culprit/app/src/gen/WarehouseFleetRow";
 import type { WarehouseFleetFreshness } from "../../vendor/culprit/app/src/gen/WarehouseFleetFreshness";
 import { EngineBadge } from "./EngineBadge";
-import w from "./en.json";
+import { w } from "./i18n";
 
 export function FleetCharts({ rows }: { rows: WarehouseFleetRow[] }) {
   if (rows.length === 0) return null;

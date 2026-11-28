@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Check, Monitor, Moon, Palette, Sun, Terminal } from "lucide-react";
+import { useLocale, w } from "./i18n";
 
 export type ThemeChoice =
   | "system"
@@ -158,6 +159,7 @@ export function useTheme() {
 }
 
 export function ThemePicker() {
+  useLocale();
   const { choice, resolved, colorMode, setTheme } = useTheme();
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -194,19 +196,19 @@ export function ThemePicker() {
       <button
         type="button"
         className="top-pill"
-        aria-label="Theme"
+        aria-label={w.theme}
         aria-expanded={open}
-        title={`Theme: ${activeMeta.label}`}
+        title={`${w.theme}: ${activeMeta.label}`}
         onClick={() => setOpen((v) => !v)}
       >
         <Icon size={15} />
         <span className="top-pill-label">{activeMeta.label}</span>
       </button>
       {open && (
-        <div className="theme-popover panel" role="dialog" aria-label="Choose theme">
+        <div className="theme-popover panel" role="dialog" aria-label={w.colorAppearance}>
           <div className="theme-popover-head">
             <Palette size={14} />
-            <span>Appearance</span>
+            <span>{w.colorAppearance}</span>
           </div>
           <div className="theme-list">
             {THEMES.map((theme) => {
